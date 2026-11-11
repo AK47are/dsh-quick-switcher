@@ -3,7 +3,15 @@
   "version": "0.1.3",
   "private": true,
   "type": "module",
-  "description": "快速切换器：统一搜索入口，当前支持按标题、工作区或路径切换会话。",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "check": "node scripts/build.js --check",
+    "test": "node --test tests"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "description": "快速切换器：统一搜索入口，按标题、工作区或路径切换会话，也能进入工作区新建会话。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

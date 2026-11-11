@@ -1,6 +1,6 @@
 {
   "name": "dsh-quick-switcher",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "type": "module",
   "description": "快速切换器：统一搜索入口，当前支持按标题、工作区或路径切换会话。",

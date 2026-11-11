@@ -1,6 +1,6 @@
 {
   "name": "dsh-quick-switcher",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "快速切换器：统一搜索入口，当前支持按标题、工作区或路径切换会话。",
@@ -31,6 +31,7 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-shortcuts",
         "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-primitives",
         "@deepseek-ai/dsh-client-ui-session",
         "@deepseek-ai/dsh-client-ui-workspace"
       ]

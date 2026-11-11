@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Session switcher">
+  <path d="M4 4.75h12.5a2.25 2.25 0 0 1 2.25 2.25v5.5a2.25 2.25 0 0 1-2.25 2.25H9.5L5.5 18v-3.25H4A2.25 2.25 0 0 1 1.75 12.5V7A2.25 2.25 0 0 1 4 4.75Z" fill="none" stroke="#4f7cff" stroke-width="1.6" stroke-linejoin="round"/>
+  <circle cx="15.7" cy="15.7" r="4.05" fill="none" stroke="#4f7cff" stroke-width="1.6"/>
+  <path d="m18.7 18.7 3.05 3.05" fill="none" stroke="#4f7cff" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,4 @@
+# dsh-quick-switcher bundle patch: inserts this client plugin into a profile.
+- insert:
+    - id: dsh-quick-switcher
+      name: dsh-quick-switcher

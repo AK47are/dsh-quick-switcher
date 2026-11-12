@@ -1,6 +1,7 @@
 /* Plugin face: locale, shortcut command, and the overlay slot. */
 
 import { createOpenStore } from "./open-store.js";
+import { createRecentCommands } from "./data/recent.js";
 import { en, zh } from "./i18n.js";
 import { QuickSwitcher } from "./panel/quick-switcher.js";
 
@@ -16,6 +17,7 @@ export function apply(ctx) {
   );
   const t = ctx.locale.bind(NS);
   const store = createOpenStore();
+  const recent = createRecentCommands();
 
   ctx.effect(
     () =>
@@ -57,6 +59,8 @@ export function apply(ctx) {
         inject: () => ({
           store,
           uiWorkspace: ctx.uiWorkspace,
+          shortcuts: ctx.shortcuts,
+          recent,
         }),
       },
       QuickSwitcher,

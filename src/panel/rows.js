@@ -9,6 +9,29 @@ export function Keycap({ children }) {
   return h("kbd", { className: "dqs-keycap" }, children);
 }
 
+/**
+ * Render one effective shortcut binding.
+ *
+ * DSH already formats the labels for the current platform, including turning
+ * the modifier separator into its own "+" entry on Windows. That separator is
+ * punctuation rather than a key, so it renders as text instead of a keycap.
+ */
+export function Keycaps({ keys }) {
+  return h(
+    "span",
+    { className: "dqs-keys" },
+    keys.map((key, index) =>
+      key === "+"
+        ? h(
+            "span",
+            { key: index, className: "dqs-key-sep", "aria-hidden": true },
+            "+",
+          )
+        : h(Keycap, { key: index }, key),
+    ),
+  );
+}
+
 export function SearchGlyph() {
   return h(
     "svg",
@@ -140,6 +163,7 @@ export function RowView({ row, selected, index, onHover, onActivate, registerRef
     h(
       "div",
       { className: "dqs-status" },
+      row.keys && row.keys.length > 0 ? h(Keycaps, { keys: row.keys }) : null,
       row.status
         ? h(SessionStatusDot, { state: row.status.state, label: row.status.label })
         : null,

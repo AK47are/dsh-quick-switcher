@@ -8,6 +8,8 @@ const h = React.createElement;
 export function QuickSwitcher({
   store,
   uiWorkspace,
+  shortcuts,
+  recent,
   t,
   useSessions,
   useWorkspaces,
@@ -23,6 +25,8 @@ export function QuickSwitcher({
     ? h(QuickSwitcherDialog, {
         store,
         uiWorkspace,
+        shortcuts,
+        recent,
         t,
         useSessions,
         useWorkspaces,

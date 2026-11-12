@@ -176,6 +176,17 @@ export const STYLE = `
         flex: 0 0 auto;
         align-items: center;
       }
+      .dqs-keys {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 2px;
+      }
+      .dqs-key-sep {
+        color: var(--dsw-alias-label-tertiary);
+        font-size: 10px;
+        line-height: 1;
+      }
       .dqs-badge {
         padding: 1px 6px;
         border-radius: 999px;

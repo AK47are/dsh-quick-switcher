@@ -25,6 +25,7 @@ export function createSessionsRoute() {
           { keys: ["Enter"], label: ctx.t("hintOpen") },
           { keys: ["Esc"], label: ctx.t("hintClose") },
           { keys: ["+"], label: ctx.t("hintWorkspaceMode") },
+          { keys: [">"], label: ctx.t("hintCommandMode") },
         ],
         count: ctx.t("count", { count: rows.length }),
       };

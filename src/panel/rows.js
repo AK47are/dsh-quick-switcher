@@ -101,8 +101,13 @@ export function highlightTitle(text, positions) {
  *
  * A route decides what to show by filling the uniform row shape; the panel
  * only owns selection, icons, status, badges, and click dispatch.
+ *
+ * Hover is reported as `pointermove` rather than `mouseenter`: the browser
+ * replays enter events for elements that appear under a stationary pointer,
+ * so an enter-driven selection would follow the layout instead of the user.
+ * The panel decides whether a move is real; the row only reports it.
  */
-export function RowView({ row, selected, index, onHover, onActivate, registerRef }) {
+export function RowView({ row, selected, index, onPointerMove, onActivate, registerRef }) {
   const className = ["dqs-row", selected ? "dqs-row-selected" : "", row.className ?? ""]
     .filter(Boolean)
     .join(" ");
@@ -116,7 +121,7 @@ export function RowView({ row, selected, index, onHover, onActivate, registerRef
       "aria-selected": selected ? "true" : "false",
       className,
       ref: registerRef,
-      onMouseEnter: onHover,
+      onPointerMove,
       onMouseDown: (event) => event.preventDefault(),
       onClick: (event) => onActivate(event.shiftKey),
     },

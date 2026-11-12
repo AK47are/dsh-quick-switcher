@@ -4,6 +4,7 @@ import React from "react";
 import { getAccessStore } from "../data/access.js";
 import { collectSessionEntries } from "../data/sessions.js";
 import { collectWorkspaceRows } from "../data/workspaces.js";
+import { createPointerGate, getPointerBaseline } from "../pointer.js";
 import { createRoutes, pickView } from "../routes/index.js";
 import { CloseGlyph, RowView, SearchGlyph } from "./rows.js";
 import { Hints } from "./hints.js";
@@ -80,6 +81,16 @@ export function QuickSwitcherDialog({
   const [selected, setSelected] = React.useState(0);
   const [error, setError] = React.useState(null);
   const [caretRequest, setCaretRequest] = React.useState(0);
+
+  // Hover only moves the caret once the pointer really moved. Browsers replay
+  // hover events for elements that appear under a stationary pointer, so an
+  // unguarded hover would replace the opening row and could also steal the
+  // caret when a query reflow puts another row under the same pointer. The
+  // gate is seeded with the position recorded before the panel opened.
+  const hoverGate = React.useRef(null);
+  if (hoverGate.current === null) {
+    hoverGate.current = createPointerGate(getPointerBaseline());
+  }
 
   const view = React.useMemo(
     () =>
@@ -285,7 +296,10 @@ export function QuickSwitcherDialog({
           row,
           selected: index === selected,
           index,
-          onHover: () => setSelected(index),
+          onPointerMove: (event) => {
+            if (!hoverGate.current.accept(event.clientX, event.clientY)) return;
+            setSelected(index);
+          },
           onActivate: (shiftKey) => activate(row, shiftKey),
           registerRef: (node) => {
             if (node) rowRefs.current.set(row.key, node);

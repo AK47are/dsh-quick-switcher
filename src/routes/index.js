@@ -1,5 +1,6 @@
 /* Route table and dispatch. */
 
+import { createCommandsRoute } from "./commands.js";
 import { createSessionsRoute } from "./sessions.js";
 import { createWorkspacesRoute } from "./workspaces.js";
 
@@ -12,9 +13,11 @@ import { createWorkspacesRoute } from "./workspaces.js";
  * panel closes.
  */
 export function createRoutes() {
-  return [createWorkspacesRoute(), createSessionsRoute()].sort(
-    (left, right) => right.prefix.length - left.prefix.length,
-  );
+  return [
+    createWorkspacesRoute(),
+    createCommandsRoute(),
+    createSessionsRoute(),
+  ].sort((left, right) => right.prefix.length - left.prefix.length);
 }
 
 /** Build the active view for a query. The default route always claims it. */

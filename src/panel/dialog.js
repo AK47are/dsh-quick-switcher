@@ -2,6 +2,11 @@
 
 import React from "react";
 import { getAccessStore } from "../data/access.js";
+import {
+  buildCommandEntries,
+  commandContext,
+  resolveCommand,
+} from "../data/commands.js";
 import { collectSessionEntries } from "../data/sessions.js";
 import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createRoutes, pickView } from "../routes/index.js";
@@ -36,6 +41,8 @@ function firstContentIndex(rows) {
 export function QuickSwitcherDialog({
   store,
   uiWorkspace,
+  shortcuts,
+  recent,
   t,
   useSessions,
   useWorkspaces,
@@ -72,6 +79,24 @@ export function QuickSwitcherDialog({
     [workspaceList, entries],
   );
 
+  // The shortcut catalog is a snapshot store owned by DSH. Reading it here
+  // keeps the command list live while plugins register or unload commands, and
+  // the localized labels refresh with the catalog itself. Recents are read per
+  // catalog change; opening the panel is the only moment the order is needed.
+  const commandCatalog = React.useSyncExternalStore(
+    shortcuts.catalog.subscribe,
+    shortcuts.catalog.getSnapshot,
+  );
+  const shortcutConfig = React.useSyncExternalStore(
+    shortcuts.config.subscribe,
+    shortcuts.config.getSnapshot,
+  );
+  const commandEntries = React.useMemo(
+    () => buildCommandEntries(commandCatalog, recent.read()),
+    [commandCatalog, recent],
+  );
+  const commandsLoading = shortcutConfig.status === "loading";
+
   const [query, setQuery] = React.useState("");
   // The caret starts on the first row: the previous session when the access
   // history knows one, otherwise the status leader. Opening the panel never
@@ -87,10 +112,20 @@ export function QuickSwitcherDialog({
         sessionEntries: entries,
         workspaceRows,
         currentId,
+        commandEntries,
+        commandsLoading,
         t,
         now: Date.now(),
       }),
-    [query, entries, workspaceRows, currentId, t],
+    [
+      query,
+      entries,
+      workspaceRows,
+      currentId,
+      commandEntries,
+      commandsLoading,
+      t,
+    ],
   );
   const rows = view.rows;
 
@@ -194,14 +229,61 @@ export function QuickSwitcherDialog({
       sessionEntries: entries,
       workspaceRows,
       currentId,
+      commandEntries,
+      commandsLoading,
       t,
       now: Date.now(),
     });
+
+  /**
+   * Close the overlay, then run a command on the next task.
+   *
+   * `resolve` already ran while the overlay was open, so a blocked command
+   * never reaches this path. Deferring the action lets React unmount the
+   * dialog and restore the pre-open focus first; a command that opens its own
+   * modal would otherwise stack on top of a still-mounted overlay. A throwing
+   * command after the panel is gone has no surface left to report through, so
+   * it is logged instead of swallowed.
+   */
+  const runCommand = (id) => {
+    const outcome = resolveCommand(
+      shortcuts.registry,
+      id,
+      commandContext(previousFocus.current),
+    );
+    if (outcome.status === "missing") {
+      setError(t("commandMissing"));
+      return;
+    }
+    if (outcome.status === "failed") {
+      console.error("[dsh-quick-switcher] command resolve failed", outcome.error);
+      setError(t("commandFailed"));
+      return;
+    }
+    if (outcome.status !== "handled") {
+      setError(outcome.reason ?? t("commandBlocked"));
+      return;
+    }
+
+    recent.record(id);
+    close(true);
+    window.setTimeout(() => {
+      try {
+        outcome.run();
+      } catch (error) {
+        console.error("[dsh-quick-switcher] command failed", error);
+      }
+    }, 0);
+  };
 
   const applyEffect = (effect) => {
     if (!effect) return;
     if (effect.type === "close") {
       close(effect.restoreFocus === true);
+      return;
+    }
+    if (effect.type === "command") {
+      runCommand(effect.id);
       return;
     }
     if (effect.type === "query") {
@@ -224,6 +306,7 @@ export function QuickSwitcherDialog({
   const onQueryChange = (value) => {
     const nextView = buildView(value);
     setQuery(value);
+    setError(null);
     // Typing never targets an action row: filter text is about content.
     setSelected(firstContentIndex(nextView.rows));
   };

@@ -12,13 +12,30 @@ function toEntry(row, isRecent) {
   const aliases = Array.isArray(row.aliases)
     ? row.aliases.filter((value) => typeof value === "string" && value !== "")
     : [];
+
+  // The label is localized, but the aliases users type are usually English.
+  // Show the Latin spellings under the name so a Chinese label still explains
+  // what to search for. Localized aliases stay searchable but are not repeated
+  // under their own translation.
+  const labelKey = label.toLocaleLowerCase();
+  const seen = new Set();
+  const visibleAliases = [];
+  for (const alias of aliases) {
+    if (!/[A-Za-z]/u.test(alias)) continue;
+    const key = alias.toLocaleLowerCase();
+    if (key === labelKey || seen.has(key)) continue;
+    seen.add(key);
+    visibleAliases.push(alias);
+  }
+
   return {
     id: row.id,
     label,
     title: label,
-    titleLower: label.toLocaleLowerCase(),
+    titleLower: labelKey,
     metaLower: aliases.join(" ").toLocaleLowerCase(),
     aliases,
+    aliasesText: visibleAliases.join(" · "),
     keys: Array.isArray(row.keys)
       ? row.keys.filter((value) => typeof value === "string")
       : [],

@@ -69,6 +69,33 @@ test("commands list recents first, then the catalog by name", () => {
     ],
   );
   assert.deepEqual(entries[0].keys, ["Ctrl", "+", "N"]);
+  assert.equal(entries[0].aliasesText, "new chat");
+});
+
+test("command rows show Latin aliases but hide translations and the label itself", () => {
+  const [entry] = buildCommandEntries(
+    [
+      {
+        id: "settings.open",
+        label: "打开设置",
+        aliases: ["settings", "Settings", "设置", "preferences"],
+      },
+    ],
+    [],
+  );
+  assert.equal(entry.aliasesText, "settings · preferences");
+
+  const [sameAsLabel] = buildCommandEntries(
+    [{ id: "settings.open", label: "Settings", aliases: ["settings", "preferences"] }],
+    [],
+  );
+  assert.equal(sameAsLabel.aliasesText, "preferences");
+
+  const [chineseOnly] = buildCommandEntries(
+    [{ id: "settings.open", label: "打开设置", aliases: ["设置"] }],
+    [],
+  );
+  assert.equal(chineseOnly.aliasesText, "");
 });
 
 test("recents keep their order, skip unknown ids, and never repeat", () => {
@@ -113,6 +140,8 @@ test("the command route shows keycaps, the recent badge, and the run effect", ()
     ["x:session.new", "x:settings.open", "x:shortcuts.open"],
   );
   assert.deepEqual(view.rows[0].keys, ["Ctrl", "+", "N"]);
+  assert.equal(view.rows[0].meta[0].text, "new chat");
+  assert.equal(view.rows[1].meta[0].text, "preferences");
   assert.equal(view.rows[0].badge, "recentBadge");
   assert.equal(view.rows[1].badge, undefined);
   assert.deepEqual(view.rows[1].run(), { type: "command", id: "settings.open" });

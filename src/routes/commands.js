@@ -23,7 +23,10 @@ export function createCommandsRoute() {
           key: `x:${entry.id}`,
           title: entry.label,
           positions,
-          meta: [],
+          meta:
+            entry.aliasesText === ""
+              ? []
+              : [{ text: entry.aliasesText, className: "dqs-command-aliases" }],
           keys: entry.keys,
           badge: entry.isRecent ? ctx.t("recentBadge") : undefined,
           className: "dqs-command-row",

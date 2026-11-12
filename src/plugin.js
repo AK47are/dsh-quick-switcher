@@ -4,6 +4,7 @@ import { createOpenStore } from "./open-store.js";
 import { createRecentCommands } from "./data/recent.js";
 import { en, zh } from "./i18n.js";
 import { QuickSwitcher } from "./panel/quick-switcher.js";
+import { startPointerBaseline } from "./pointer.js";
 
 const NS = "dsh-quick-switcher";
 const COMMAND_ID = "quickSwitcher.open";
@@ -18,6 +19,14 @@ export function apply(ctx) {
   const t = ctx.locale.bind(NS);
   const store = createOpenStore();
   const recent = createRecentCommands();
+
+  // The panel must know where the pointer really was before it opened, because
+  // the browser replays hover events for elements that appear under a
+  // stationary pointer. Tracking starts with the plugin, not with the panel.
+  ctx.effect(
+    () => startPointerBaseline(document),
+    "quick-switcher: pointer baseline",
+  );
 
   ctx.effect(
     () =>

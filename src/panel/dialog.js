@@ -1,6 +1,7 @@
 /* Panel shell: input, selection, keyboard, and route dispatch. */
 
 import React from "react";
+import { getAccessStore } from "../data/access.js";
 import { collectSessionEntries } from "../data/sessions.js";
 import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createRoutes, pickView } from "../routes/index.js";
@@ -51,9 +52,19 @@ export function QuickSwitcherDialog({
   const routes = React.useRef(null);
   if (routes.current === null) routes.current = createRoutes();
 
+  // The access map is read once per panel mount: the modal blocks navigation,
+  // so no visit can be recorded while it is open.
+  const accessTimes = React.useMemo(() => getAccessStore().getSnapshot(), []);
   const sessionData = React.useMemo(
-    () => collectSessionEntries(sessionList, workspaceList, statuses, isPanelActive),
-    [sessionList, workspaceList, statuses, isPanelActive],
+    () =>
+      collectSessionEntries(
+        sessionList,
+        workspaceList,
+        statuses,
+        isPanelActive,
+        accessTimes,
+      ),
+    [sessionList, workspaceList, statuses, isPanelActive, accessTimes],
   );
   const { entries, currentId } = sessionData;
   const workspaceRows = React.useMemo(
@@ -62,6 +73,10 @@ export function QuickSwitcherDialog({
   );
 
   const [query, setQuery] = React.useState("");
+  // The caret starts on the first row: the previous session when the access
+  // history knows one, otherwise the status leader. Opening the panel never
+  // jumps to the current session, because the first Enter should switch away
+  // from it rather than close the panel.
   const [selected, setSelected] = React.useState(0);
   const [error, setError] = React.useState(null);
   const [caretRequest, setCaretRequest] = React.useState(0);
@@ -84,7 +99,6 @@ export function QuickSwitcherDialog({
   const previousFocus = React.useRef(null);
   const skipRestore = React.useRef(false);
   const rowRefs = React.useRef(new Map());
-  const initialSelection = React.useRef(false);
   const titleId = React.useId();
   const listId = React.useId();
 
@@ -115,16 +129,6 @@ export function QuickSwitcherDialog({
     const end = input.value.length;
     input.setSelectionRange?.(end, end);
   }, [caretRequest]);
-
-  // Opening the panel selects the current session when the list starts
-  // unfiltered. A route that opens a scope selects its own row instead.
-  React.useEffect(() => {
-    if (initialSelection.current || rows.length === 0) return;
-    initialSelection.current = true;
-    if (query !== "") return;
-    const index = rows.findIndex((row) => row.current === true);
-    if (index > 0) setSelected(index);
-  }, [rows, query]);
 
   React.useEffect(() => {
     if (selected >= rows.length) {

@@ -43,8 +43,15 @@ export function relativeTime(millis, t, now) {
   });
 }
 
-/** Relative time, or the sidebar's compact pending label while waiting. */
+/**
+ * Relative time, or the sidebar's compact pending label while waiting.
+ *
+ * The switcher sorts empty-query rows by `recentAt` (last time the session
+ * was shown, falling back to `updatedAt`), so the label shows that same value
+ * and the visible time always explains the order above it.
+ */
 export function rowTimeLabel(entry, t, now) {
   if (entry.status.compactKey !== null) return t(entry.status.compactKey);
-  return entry.updatedAt ? relativeTime(entry.updatedAt, t, now) : "";
+  const recentAt = entry.recentAt > 0 ? entry.recentAt : entry.updatedAt;
+  return recentAt ? relativeTime(recentAt, t, now) : "";
 }

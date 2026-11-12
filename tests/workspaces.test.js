@@ -29,9 +29,11 @@ function entry(id, title, workspace, updatedAt) {
   };
 }
 
+// The switcher hands entries over in display order (retained, status, access),
+// so the fixture keeps that order instead of sorting by updatedAt.
 const entries = [
-  entry("e1", "Fix parser", "Alpha", 100),
   entry("e2", "Add tests", "Alpha", 200),
+  entry("e1", "Fix parser", "Alpha", 100),
   entry("e3", "Docs", "Beta project", 50),
 ];
 
@@ -87,7 +89,20 @@ test("plus lists workspaces and copies filter fields", () => {
   assert.equal(view.rows[0].trailing, "count:2");
 });
 
-test("Enter enters the workspace and selects its most recent session", () => {
+test("scope sessions keep the incoming display order", () => {
+  const displayOrder = [
+    entry("e1", "Fix parser", "Alpha", 100),
+    entry("e2", "Add tests", "Alpha", 200),
+  ];
+  const rows = collectWorkspaceRows(workspaceList, displayOrder);
+  assert.deepEqual(
+    rows[0].sessions.map((session) => session.id),
+    ["e1", "e2"],
+  );
+  assert.equal(rows[0].updatedAt, 200);
+});
+
+test("Enter enters the workspace and selects its first session", () => {
   const workspaceRows = collectWorkspaceRows(workspaceList, entries);
   const ctx = context(workspaceRows);
   const route = createWorkspacesRoute();

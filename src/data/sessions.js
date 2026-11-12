@@ -121,6 +121,35 @@ export function describeStatus(status, t) {
 }
 
 /**
+ * The first session the main view still retains.
+ *
+ * DSH exposes retention as a reference count rather than a "last viewed"
+ * pointer. When several rows are retained, the sidebar itself highlights the
+ * first one in snapshot order, so the switcher uses the same expression and
+ * its pinned row always agrees with the sidebar's current row.
+ */
+export function retainedSessionId(sessionList) {
+  const byId = sessionList?.byId ?? {};
+  for (const row of Object.values(byId)) {
+    if ((row?.retainedBy?.mainView ?? 0) > 0) return row.id ?? null;
+  }
+  return null;
+}
+
+/**
+ * Empty-query status groups, most important first.
+ *
+ * These are DSH's own StateDot states: done is the green completion dot,
+ * warning the pending interaction dot, and ongoing the spinner (own activity
+ * or running subagents). Idle rows carry no dot and close the list.
+ */
+const STATE_RANK = { done: 0, warning: 1, ongoing: 2, idle: 3 };
+
+function stateRank(status) {
+  return STATE_RANK[status?.state] ?? STATE_RANK.idle;
+}
+
+/**
  * Build the searchable session rows.
  *
  * Archived, blank, and subagent generations are excluded: the first is
@@ -133,8 +162,24 @@ export function describeStatus(status, t) {
  * completed state for the same moment. The current marker follows the
  * sidebar's panel check: a main panel covers the conversation without
  * releasing its retention, so no row is current while a panel is active.
+ *
+ * The empty-query order is the switcher's own. The previous session leads:
+ * the most recently accessed visible session other than the one the main
+ * view is currently showing, which on a main panel page is simply the last
+ * conversation. The rest follow the status rank, and rows of one rank follow
+ * `recentAt`: the last time the plugin saw the session shown, or `updatedAt`
+ * for a session it has never observed. The pinned row appears once and is
+ * therefore absent from its own status position. Search results keep the
+ * route's relevance order instead; this list is the base for both, so its
+ * order is the only tie the routes inherit.
  */
-export function collectSessionEntries(sessionList, workspaceList, statuses, isPanelActive) {
+export function collectSessionEntries(
+  sessionList,
+  workspaceList,
+  statuses,
+  isPanelActive,
+  accessTimes,
+) {
   const archived = new Set(
     Array.isArray(workspaceList?.archivedSessionIds)
       ? workspaceList.archivedSessionIds
@@ -153,11 +198,8 @@ export function collectSessionEntries(sessionList, workspaceList, statuses, isPa
   }
 
   const byId = sessionList?.byId ?? {};
-  // The sidebar highlights the first row still retained by the main view;
-  // this is the same expression, so both surfaces mark exactly one current.
-  const currentId = isPanelActive
-    ? null
-    : Object.values(byId).find((row) => (row.retainedBy?.mainView ?? 0) > 0)?.id ?? null;
+  const retainedId = retainedSessionId(sessionList);
+  const currentId = isPanelActive ? null : retainedId;
 
   const entries = [];
   for (const id of sessionList?.ids ?? []) {
@@ -168,6 +210,8 @@ export function collectSessionEntries(sessionList, workspaceList, statuses, isPa
     const workspace = workspaceBySession.get(id);
     const title = cleanTitle(row.displayTitle || row.title, id);
     const subagentCount = runningChildCount(sessionList, id, statuses);
+    const updatedAt = toMillis(row.updatedAt);
+    const lastAccessAt = accessTimes?.get?.(id) ?? 0;
     entries.push({
       id,
       title,
@@ -175,11 +219,42 @@ export function collectSessionEntries(sessionList, workspaceList, statuses, isPa
       workspace: workspace?.title ?? "",
       path: workspace?.path ?? String(row.cwd ?? ""),
       metaLower: `${workspace?.title ?? ""} ${workspace?.path ?? row.cwd ?? ""}`.toLocaleLowerCase(),
-      updatedAt: toMillis(row.updatedAt),
+      updatedAt,
+      lastAccessAt,
+      recentAt: lastAccessAt > 0 ? lastAccessAt : updatedAt,
       status: sessionStatusOf(row, statuses, subagentCount),
       current: id === currentId,
+      pinned: false,
     });
   }
-  entries.sort((left, right) => right.updatedAt - left.updatedAt);
+
+  // DSH exposes retention for the row the main view shows, not a visit
+  // stack. The previous session therefore comes from the plugin's own access
+  // map: the newest access other than the current row. With no history there
+  // is no honest candidate, so nothing is pinned and the list starts at the
+  // status order.
+  let pinned = null;
+  for (const entry of entries) {
+    if (entry.id === currentId) continue;
+    if (entry.lastAccessAt <= 0) continue;
+    if (
+      pinned === null ||
+      entry.lastAccessAt > pinned.lastAccessAt ||
+      (entry.lastAccessAt === pinned.lastAccessAt &&
+        (entry.updatedAt > pinned.updatedAt ||
+          (entry.updatedAt === pinned.updatedAt && entry.id < pinned.id)))
+    ) {
+      pinned = entry;
+    }
+  }
+  for (const entry of entries) entry.pinned = entry === pinned;
+
+  entries.sort((left, right) => {
+    if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+    const rank = stateRank(left.status) - stateRank(right.status);
+    if (rank !== 0) return rank;
+    if (left.recentAt !== right.recentAt) return right.recentAt - left.recentAt;
+    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+  });
   return { entries, currentId };
 }

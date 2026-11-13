@@ -11,7 +11,7 @@
   "devDependencies": {
     "esbuild": "0.28.2"
   },
-  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令。",
+  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令、搜索工作区文件。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

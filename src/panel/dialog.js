@@ -12,6 +12,7 @@ import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createPointerGate, getPointerBaseline } from "../pointer.js";
 import { createRoutes, pickView } from "../routes/index.js";
 import { CloseGlyph, RowView, SearchGlyph } from "./rows.js";
+import { focusSidebarPane } from "./rightbar.js";
 import { Hints } from "./hints.js";
 import { STYLE } from "./styles.js";
 
@@ -43,6 +44,7 @@ export function QuickSwitcherDialog({
   store,
   uiWorkspace,
   shortcuts,
+  files,
   recent,
   t,
   useSessions,
@@ -55,10 +57,21 @@ export function QuickSwitcherDialog({
   const statuses = useSessionStatus((state) => state);
   const isPanelActive = usePanelInfo((info) => info.activePanelId !== null);
 
+  // An asynchronous route (the "@" file search) asks the shell for one more
+  // render after its result settles; `revision` is the shell's answer and the
+  // only reason a view may be rebuilt without a query or data change.
+  const [revision, bump] = React.useReducer((value) => value + 1, 0);
+
   // Route instances live for one panel mount, so the workspaces token resets
   // when the panel closes instead of leaking into the next open.
   const routes = React.useRef(null);
-  if (routes.current === null) routes.current = createRoutes();
+  if (routes.current === null) routes.current = createRoutes({ notify: bump });
+  React.useEffect(
+    () => () => {
+      for (const route of routes.current ?? []) route.dispose?.();
+    },
+    [],
+  );
 
   // The access map is read once per panel mount: the modal blocks navigation,
   // so no visit can be recorded while it is open.
@@ -125,6 +138,7 @@ export function QuickSwitcherDialog({
         currentId,
         commandEntries,
         commandsLoading,
+        files,
         t,
         now: Date.now(),
       }),
@@ -135,10 +149,19 @@ export function QuickSwitcherDialog({
       currentId,
       commandEntries,
       commandsLoading,
+      files,
       t,
+      revision,
     ],
   );
   const rows = view.rows;
+
+  // A route that cannot answer synchronously returns empty rows plus a `load`
+  // to run after the render. The route dedupes by query, so re-renders caused
+  // by unrelated data (statuses, the shortcut catalog) cost nothing.
+  React.useEffect(() => {
+    view.load?.();
+  }, [view]);
 
   const inputRef = React.useRef(null);
   const closeRef = React.useRef(null);
@@ -235,6 +258,27 @@ export function QuickSwitcherDialog({
   };
 
   const activation = { openSession, startSession };
+
+  /**
+   * Ask DSH to show one workspace file in the right Sidebar.
+   *
+   * The address carries the Session, so the Sidebar needs no absolute path
+   * from the panel. A throw means there is no on-screen Session surface to
+   * place the tab in; the panel stays open and reports it instead of closing
+   * over a file the user never sees.
+   */
+  const openFile = (path) => {
+    if (currentId === null) return false;
+    try {
+      files.open(currentId, path);
+      return true;
+    } catch (error) {
+      console.error("[dsh-quick-switcher] file open failed", error);
+      setError(t("fileOpenFailed"));
+      return false;
+    }
+  };
+
   const buildView = (nextQuery) =>
     pickView(routes.current, nextQuery, {
       sessionEntries: entries,
@@ -242,6 +286,7 @@ export function QuickSwitcherDialog({
       currentId,
       commandEntries,
       commandsLoading,
+      files,
       t,
       now: Date.now(),
     });
@@ -291,6 +336,18 @@ export function QuickSwitcherDialog({
     if (!effect) return;
     if (effect.type === "close") {
       close(effect.restoreFocus === true);
+      return;
+    }
+    if (effect.type === "file") {
+      if (!openFile(effect.path)) return;
+      if (effect.focus === "preview") {
+        // Skipping focus restoration keeps the panel from yanking the caret
+        // back to the composer while the Sidebar column is opening.
+        close(false);
+        focusSidebarPane(document, currentId);
+      } else {
+        close(true);
+      }
       return;
     }
     if (effect.type === "command") {

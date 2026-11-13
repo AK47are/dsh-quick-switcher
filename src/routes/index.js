@@ -1,6 +1,7 @@
 /* Route table and dispatch. */
 
 import { createCommandsRoute } from "./commands.js";
+import { createFilesRoute } from "./files.js";
 import { createSessionsRoute } from "./sessions.js";
 import { createWorkspacesRoute } from "./workspaces.js";
 
@@ -9,12 +10,17 @@ import { createWorkspacesRoute } from "./workspaces.js";
  *
  * Routes are matched by prefix, longest first; the sessions route owns the
  * empty prefix and therefore always closes the chain. Instances are created
- * per panel mount so route-local state (the workspaces token) resets when the
- * panel closes.
+ * per panel mount so route-local state (the workspaces token, the file query
+ * cache) resets when the panel closes.
+ *
+ * `notify` is how an asynchronous route asks the shell for one more render:
+ * the files route settles Host search results after the synchronous view has
+ * already been projected. The shell owns the render; routes only request it.
  */
-export function createRoutes() {
+export function createRoutes({ notify } = {}) {
   return [
     createWorkspacesRoute(),
+    createFilesRoute({ notify }),
     createCommandsRoute(),
     createSessionsRoute(),
   ].sort((left, right) => right.prefix.length - left.prefix.length);

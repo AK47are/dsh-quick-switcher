@@ -130,6 +130,11 @@ export const STYLE = `
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .dqs-file-directory {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .dqs-command-aliases {
         flex: 1 1 auto;
         min-width: 0;

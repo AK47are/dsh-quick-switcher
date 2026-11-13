@@ -93,7 +93,7 @@ npm run check 验证提交的 client.js 与源码一致，npm test 跑搜索、�
 
 命令行由 src/routes/commands.js 认领 > 前缀；src/data/commands.js 把快捷键 catalog 投影成条目并实现执行判定，src/data/recent.js 维护最近命令列表。命令本身仍由 DSH 注册和解析，插件不复制命令定义。
 
-文件模式由 src/routes/files.js 认领 @ 前缀；src/data/files.js 负责路径拆分与文件地址。路由不持有 DSH 服务，搜索与打开都走面板传入的 files 能力，由 src/plugin.js 在调用时取 remote.fileReferences 与 sidebarRight；src/panel/rightbar.js 只负责打开后把焦点交给右侧栏。
+文件模式由 src/routes/files.js 认领 @ 前缀；src/data/files.js 负责路径拆分与文件地址。路由不持有 DSH 服务，搜索与打开都走面板传入的 files 能力，由 src/plugin.js 按名字从共享服务表取 remote.fileReferences 与 sidebarRight；src/panel/rightbar.js 只负责打开后把焦点交给右侧栏。
 
 主面板行由 src/routes/panels.js 认领 # 前缀；src/data/panels.js 读 `sidebar.panellist` 的注册项、解析三种标签形态并维护可订阅快照，src/plugin.js 负责在注册变化与语言切换时刷新它。
 
@@ -116,7 +116,7 @@ npm run check 验证提交的 client.js 与源码一致，npm test 跑搜索、�
 - 输入历史依赖 `conversation.input.overlay` 的标准属性（`useChat`、`useInput`、`useSession`、`inputActions`）与 `sessions.binding(id).session.loadOlder()`；DSH 升级后如果这些接口改名，需要回归
 - `/history` 不能与宿主内置命令重名；宿主新增同名命令时插件会在构建命令菜单时抛错，需要给斜杠命令改名
 - 新建会话依赖 `uiWorkspace.startSession`，DSH 0.2.2 之前没有这个方法
-- 文件搜索依赖 `ctx.get("remote").fileReferences`，文件打开与预览依赖 `ctx.get("sidebarRight").openResource` 和 `dsh-resource://file/session/...` 地址；这两个都不是 DSH 的公开 API，DSH 升级后需要回归。它们按需查找，缺了只会让文件模式报错，不会拖住整个插件加载
+- 文件搜索依赖 `ctx.get("remote.fileReferences")`，文件打开与预览依赖 `ctx.get("sidebarRight").openResource` 和 `dsh-resource://file/session/...` 地址；这两个都不是 DSH 的公开 API，DSH 升级后需要回归。它们按名字从共享服务表读取，缺了只会让文件模式报错，不会拖住整个插件加载
 - 文件检索与右侧栏预览都要求主区域有当前会话；停在主面板页面时文件模式只显示提示
 - 文件结果上限 20 条、忽略目录与索引上限都由 DSH 的 fileReferences 配置决定，插件不覆盖
 - 目录只能靠 Enter 补全钻进，没有单独的 Tab 补全；面板里的 Tab 仍是焦点切换

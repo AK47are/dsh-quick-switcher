@@ -68,7 +68,7 @@ export function createFilesRoute({ notify = noop, debounceMs = DEBOUNCE_MS } = {
     if (pending !== null && pending.key === key) return;
     cancelPending();
     if (typeof ctx.files?.search !== "function") {
-      cache.set(key, { status: "error" });
+      cache.set(key, { status: "error", reason: "search" });
       notify();
       return;
     }
@@ -88,9 +88,12 @@ export function createFilesRoute({ notify = noop, debounceMs = DEBOUNCE_MS } = {
               : { status: "error", reason: result?.reason ?? null },
           );
         })
-        .catch(() => {
+        .catch((error) => {
           if (controller.signal.aborted) return;
-          settle(key, { status: "error" });
+          settle(key, {
+            status: "error",
+            reason: String(error?.message ?? error).slice(0, 160),
+          });
         });
     }, debounceMs);
     pending = { key, controller, timer };

@@ -88,26 +88,20 @@ function createPanelList(ctx) {
 /**
  * The "@" file mode's two DSH calls.
  *
- * Both are looked up when the panel asks, not injected as hard dependencies:
- * a profile that disables file references should still get the session
- * switcher, and it should say the file search is unavailable instead of
- * leaving the whole plugin unapplied while it waits for a service. The names
- * are DSH internal faces, so an upgrade can rename them; the panel absorbs a
- * missing face as an error state rather than a crash.
+ * Both are read from the shared service store by exact name instead of being
+ * injected or read as context properties. Property access (`ctx.remote` or
+ * `ctx.sidebarRight`) requires the service in this plugin's inject list, and a
+ * profile that disables either one would then leave the whole switcher
+ * unapplied. `ctx.get` reads the store directly, so a missing face costs only
+ * the file mode's error state.
  */
 function createFileCapability(ctx) {
   return {
     async search(sessionId, query, signal) {
-      const remote = ctx.remote;
-      const references = remote?.fileReferences;
+      const references = ctx.get("remote.fileReferences");
       if (references === undefined) {
-        console.error("[dsh-quick-switcher] file reference Remote is unavailable", {
-          remote: remote !== undefined,
-        });
-        return {
-          ok: false,
-          reason: remote === undefined ? "remote" : "fileReferences",
-        };
+        console.error("[dsh-quick-switcher] file reference Remote is unavailable");
+        return { ok: false, reason: "fileReferences" };
       }
       try {
         const result = await references.list(sessionId, query, signal);
@@ -128,7 +122,7 @@ function createFileCapability(ctx) {
       }
     },
     open(sessionId, path) {
-      const sidebarRight = ctx.sidebarRight;
+      const sidebarRight = ctx.get("sidebarRight");
       if (sidebarRight === undefined) {
         throw new Error("dsh-quick-switcher: the right Sidebar is unavailable");
       }

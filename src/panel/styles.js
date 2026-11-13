@@ -227,6 +227,12 @@ export const STYLE = `
         color: var(--dsw-alias-state-error-primary);
         font-size: 12px;
       }
+      .dqs-notice {
+        flex: 0 0 auto;
+        padding: 6px 18px;
+        color: var(--dsw-alias-label-secondary);
+        font-size: 12px;
+      }
       .dqs-footer {
         display: flex;
         flex: 0 0 auto;

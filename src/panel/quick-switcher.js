@@ -16,9 +16,14 @@ const h = React.createElement;
  * read back when the panel opens; recording pauses while a main panel covers
  * the conversation, because opening a panel is not a visit to the session
  * hidden behind it.
+ *
+ * The open snapshot also carries the seed query and its generation: the dialog
+ * starts in history mode when a command seeds "!", and a command fired while
+ * the panel is already open reseeds it in place.
  */
 export function QuickSwitcher({
   store,
+  history,
   uiWorkspace,
   shortcuts,
   layout,
@@ -30,12 +35,12 @@ export function QuickSwitcher({
   useSessionStatus,
   usePanelInfo,
 }) {
-  const open = React.useSyncExternalStore(
+  const state = React.useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,
     store.getSnapshot,
   );
-  const retainedId = useSessions((state) => retainedSessionId(state));
+  const retainedId = useSessions((list) => retainedSessionId(list));
   const isPanelActive = usePanelInfo((info) => info.activePanelId !== null);
 
   React.useEffect(() => {
@@ -43,9 +48,13 @@ export function QuickSwitcher({
     getAccessStore().record(retainedId, Date.now());
   }, [retainedId, isPanelActive]);
 
-  return open
+  return state.open
     ? h(QuickSwitcherDialog, {
         store,
+        history,
+        seed: state.seed,
+        captureDraft: state.captureDraft,
+        generation: state.generation,
         uiWorkspace,
         shortcuts,
         layout,

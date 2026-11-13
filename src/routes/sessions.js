@@ -27,6 +27,8 @@ export function createSessionsRoute() {
           { keys: ["+"], label: ctx.t("hintWorkspaceMode") },
           { keys: [">"], label: ctx.t("hintCommandMode") },
           { keys: ["@"], label: ctx.t("hintFileMode") },
+          { keys: ["!"], label: ctx.t("hintHistoryMode") },
+          { keys: ["#"], label: ctx.t("hintPanelMode") },
         ],
         count: ctx.t("count", { count: rows.length }),
       };

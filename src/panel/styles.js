@@ -142,6 +142,14 @@ export const STYLE = `
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .dqs-panel-id {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--dsw-alias-label-tertiary);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .dqs-trailing {
         flex: 0 0 auto;
         color: var(--dsw-alias-label-tertiary);
@@ -222,6 +230,12 @@ export const STYLE = `
         flex: 0 0 auto;
         padding: 6px 18px;
         color: var(--dsw-alias-state-error-primary);
+        font-size: 12px;
+      }
+      .dqs-notice {
+        flex: 0 0 auto;
+        padding: 6px 18px;
+        color: var(--dsw-alias-label-secondary);
         font-size: 12px;
       }
       .dqs-footer {

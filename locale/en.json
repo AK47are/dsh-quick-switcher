@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Quick switcher",
-    "description": "A unified search surface that switches sessions by title, workspace, or path; type + to pick a workspace, > to run an app command, or @ to search workspace files and open them in the Sidebar. Opens with Ctrl+Shift+K by default."
+    "description": "A unified search surface that switches sessions, browses workspaces, runs application commands, refills the input from sent prompts, jumps to a main panel such as Plugins or Automation tasks, and opens workspace files in the Sidebar from @. Opens with Ctrl+Shift+K by default; input history is unbound."
   }
 }

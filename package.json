@@ -1,6 +1,6 @@
 {
   "name": "dsh-quick-switcher",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
   "devDependencies": {
     "esbuild": "0.28.2"
   },
-  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令、搜索工作区文件。",
+  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令、回填输入历史、跳到主面板、搜索工作区文件。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -38,6 +38,8 @@
       "inject": [
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-shortcuts",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-primitives",
         "@deepseek-ai/dsh-client-ui-session",

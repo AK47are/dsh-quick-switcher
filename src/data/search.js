@@ -162,19 +162,24 @@ export function fuzzyMatch(text, query) {
  * or command aliases) matches, at a fixed penalty and without a title
  * highlight. Empty input keeps the route's own order; every route supplies its
  * base order before calling this function.
+ *
+ * `limit` defaults to the panel's shared result cap. History raises it because
+ * one prompt row is a single line and the route caps its own collection first.
  */
-export function filterEntries(entries, query) {
+export function filterEntries(entries, query, limit = RESULT_LIMIT) {
+  const cap =
+    Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : RESULT_LIMIT;
   const trimmed = String(query ?? "").trim();
   if (trimmed === "") {
     return entries
-      .slice(0, RESULT_LIMIT)
+      .slice(0, cap)
       .map((entry) => ({ entry, positions: null }));
   }
 
   const needle = compact(trimmed).characters;
   if (needle.length === 0) {
     return entries
-      .slice(0, RESULT_LIMIT)
+      .slice(0, cap)
       .map((entry) => ({ entry, positions: null }));
   }
 
@@ -203,6 +208,6 @@ export function filterEntries(entries, query) {
   }
   matched.sort((left, right) => right.score - left.score);
   return matched
-    .slice(0, RESULT_LIMIT)
+    .slice(0, cap)
     .map(({ entry, positions }) => ({ entry, positions }));
 }

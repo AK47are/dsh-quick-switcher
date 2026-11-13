@@ -41,6 +41,10 @@ function firstContentIndex(rows) {
  */
 export function QuickSwitcherDialog({
   store,
+  history,
+  seed,
+  captureDraft,
+  generation,
   uiWorkspace,
   shortcuts,
   recent,
@@ -98,13 +102,36 @@ export function QuickSwitcherDialog({
   );
   const commandsLoading = shortcutConfig.status === "loading";
 
-  const [query, setQuery] = React.useState("");
+  // The bridge publishes the current session's prompt window, draft, and
+  // pagination flags. The dialog subscribes so `loadOlder` results and a
+  // completed write land without reopening the panel.
+  const historySnapshot = React.useSyncExternalStore(
+    history.subscribe,
+    history.getSnapshot,
+    history.getSnapshot,
+  );
+  // The draft row stands for the text the composer held when the panel
+  // opened, not for what it holds after a history entry replaced it. Freezing
+  // it here is what makes that row a restore target. The slash command turns
+  // the capture off because its own token is still the last published draft
+  // at mount, while the input has already removed it.
+  const draftAtOpen = React.useMemo(
+    () => (captureDraft ? history.getSnapshot().draft : ""),
+    [captureDraft],
+  );
+  const historyView = React.useMemo(
+    () => ({ ...historySnapshot, draft: draftAtOpen }),
+    [historySnapshot, draftAtOpen],
+  );
+
+  const [query, setQuery] = React.useState(seed);
   // The caret starts on the first row: the previous session when the access
   // history knows one, otherwise the status leader. Opening the panel never
   // jumps to the current session, because the first Enter should switch away
   // from it rather than close the panel.
   const [selected, setSelected] = React.useState(0);
   const [error, setError] = React.useState(null);
+  const [notice, setNotice] = React.useState(null);
   const [caretRequest, setCaretRequest] = React.useState(0);
 
   // Hover only moves the caret once the pointer really moved. Browsers replay
@@ -125,6 +152,7 @@ export function QuickSwitcherDialog({
         currentId,
         commandEntries,
         commandsLoading,
+        history: historyView,
         t,
         now: Date.now(),
       }),
@@ -135,10 +163,19 @@ export function QuickSwitcherDialog({
       currentId,
       commandEntries,
       commandsLoading,
+      historyView,
       t,
     ],
   );
   const rows = view.rows;
+
+  // Commands ask the store which mode the panel shows, and the edited query is
+  // the only truth for that. Republishing the claiming prefix keeps the
+  // history shortcut's toggle decision in step with what the user actually
+  // deleted or typed.
+  React.useEffect(() => {
+    store.setPrefix(view.prefix ?? "");
+  }, [store, view.prefix]);
 
   const inputRef = React.useRef(null);
   const closeRef = React.useRef(null);
@@ -153,7 +190,11 @@ export function QuickSwitcherDialog({
     const input = inputRef.current;
     if (input) {
       input.focus();
-      input.select?.();
+      // An empty seed is a blank search box, so selecting it all costs
+      // nothing. A seeded query is a prefix the user continues from, and
+      // selecting it would let the first typed character replace the mode.
+      if (seed === "") input.select?.();
+      else input.setSelectionRange?.(input.value.length, input.value.length);
     }
     return () => {
       if (skipRestore.current) return;
@@ -175,6 +216,20 @@ export function QuickSwitcherDialog({
     const end = input.value.length;
     input.setSelectionRange?.(end, end);
   }, [caretRequest]);
+
+  // A command fired while the panel is open reseeds the query in place, so
+  // switching to history does not close and remount the surface the user is
+  // already reading. The caret lands after the seeded prefix.
+  const lastGeneration = React.useRef(generation);
+  React.useEffect(() => {
+    if (lastGeneration.current === generation) return;
+    lastGeneration.current = generation;
+    setQuery(seed);
+    setError(null);
+    setNotice(null);
+    setSelected(0);
+    setCaretRequest((value) => value + 1);
+  }, [generation, seed]);
 
   React.useEffect(() => {
     if (selected >= rows.length) {
@@ -242,6 +297,7 @@ export function QuickSwitcherDialog({
       currentId,
       commandEntries,
       commandsLoading,
+      history: historyView,
       t,
       now: Date.now(),
     });
@@ -287,6 +343,31 @@ export function QuickSwitcherDialog({
     }, 0);
   };
 
+  /**
+   * Write one history row into the conversation input without closing the
+   * panel: history is a pick surface, and the draft row only makes sense while
+   * the panel stays open to go back to it. The bridge store refuses while the
+   * input is frozen, so a refusal becomes a visible error instead of a silent
+   * no-op.
+   */
+  const applyHistory = (text) => {
+    if (history.apply(text)) {
+      setError(null);
+      setNotice(t("historyApplied"));
+      return;
+    }
+    setNotice(null);
+    setError(t("historyApplyFailed"));
+  };
+
+  const loadOlderHistory = () => {
+    setError(null);
+    const pending = history.loadOlder();
+    if (pending && typeof pending.catch === "function") {
+      pending.catch(() => setError(t("historyLoadFailed")));
+    }
+  };
+
   const applyEffect = (effect) => {
     if (!effect) return;
     if (effect.type === "close") {
@@ -295,6 +376,14 @@ export function QuickSwitcherDialog({
     }
     if (effect.type === "command") {
       runCommand(effect.id);
+      return;
+    }
+    if (effect.type === "history") {
+      applyHistory(effect.text);
+      return;
+    }
+    if (effect.type === "history-older") {
+      loadOlderHistory();
       return;
     }
     if (effect.type === "query") {
@@ -318,6 +407,7 @@ export function QuickSwitcherDialog({
     const nextView = buildView(value);
     setQuery(value);
     setError(null);
+    setNotice(null);
     // Typing never targets an action row: filter text is about content.
     setSelected(firstContentIndex(nextView.rows));
   };
@@ -461,6 +551,7 @@ export function QuickSwitcherDialog({
         },
         children,
       ),
+      notice === null ? null : h("div", { className: "dqs-notice", role: "status" }, notice),
       error === null ? null : h("div", { className: "dqs-error", role: "alert" }, error),
       h(
         "div",

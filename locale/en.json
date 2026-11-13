@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Quick switcher",
-    "description": "A unified search surface that switches sessions by title, workspace, or path; type + to pick a workspace, browse its sessions, or create a new one. Opens with Ctrl+Shift+K by default."
+    "description": "A unified search surface that switches sessions, browses workspaces, runs application commands, and refills the input from sent prompts. Opens with Ctrl+Shift+K by default; input history is unbound."
   }
 }

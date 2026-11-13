@@ -98,16 +98,37 @@ function createPanelList(ctx) {
 function createFileCapability(ctx) {
   return {
     async search(sessionId, query, signal) {
-      const references = ctx.get("remote")?.fileReferences;
-      if (references === undefined) return { ok: false };
-      const result = await references.list(sessionId, query, signal);
-      if (signal?.aborted === true) return { ok: false };
-      return result.ok === true
-        ? { ok: true, items: result.value ?? [] }
-        : { ok: false };
+      const remote = ctx.remote;
+      const references = remote?.fileReferences;
+      if (references === undefined) {
+        console.error("[dsh-quick-switcher] file reference Remote is unavailable", {
+          remote: remote !== undefined,
+        });
+        return {
+          ok: false,
+          reason: remote === undefined ? "remote" : "fileReferences",
+        };
+      }
+      try {
+        const result = await references.list(sessionId, query, signal);
+        if (signal?.aborted === true) return { ok: false };
+        if (result?.ok === true) {
+          return { ok: true, items: result.value ?? [] };
+        }
+        console.error("[dsh-quick-switcher] file search failed", result?.error);
+        const code = result?.error?.code;
+        const message = result?.error?.message;
+        return {
+          ok: false,
+          reason: `${String(code ?? "rpc")}: ${String(message ?? "")}`.slice(0, 160),
+        };
+      } catch (error) {
+        console.error("[dsh-quick-switcher] file search threw", error);
+        return { ok: false, reason: String(error?.message ?? error).slice(0, 160) };
+      }
     },
     open(sessionId, path) {
-      const sidebarRight = ctx.get("sidebarRight");
+      const sidebarRight = ctx.sidebarRight;
       if (sidebarRight === undefined) {
         throw new Error("dsh-quick-switcher: the right Sidebar is unavailable");
       }

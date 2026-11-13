@@ -85,7 +85,7 @@ export function createFilesRoute({ notify = noop, debounceMs = DEBOUNCE_MS } = {
             key,
             result?.ok === true
               ? { status: "ready", items: result.items ?? [] }
-              : { status: "error" },
+              : { status: "error", reason: result?.reason ?? null },
           );
         })
         .catch(() => {
@@ -158,8 +158,11 @@ export function createFilesRoute({ notify = noop, debounceMs = DEBOUNCE_MS } = {
       let emptyText = null;
       if (parsed.sessionId === null) emptyText = t("filesNoSession");
       else if (entry === undefined) emptyText = t("filesLoading");
-      else if (entry.status === "error") emptyText = t("filesFailed");
-      else if (rows.length === 0) emptyText = t("filesEmpty");
+      else if (entry.status === "error") {
+        emptyText = entry.reason
+          ? t("filesFailedWithReason", { reason: entry.reason })
+          : t("filesFailed");
+      } else if (rows.length === 0) emptyText = t("filesEmpty");
 
       return {
         placeholder: t("placeholderFiles"),

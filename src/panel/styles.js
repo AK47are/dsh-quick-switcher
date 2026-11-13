@@ -137,6 +137,14 @@ export const STYLE = `
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .dqs-panel-id {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--dsw-alias-label-tertiary);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .dqs-trailing {
         flex: 0 0 auto;
         color: var(--dsw-alias-label-tertiary);

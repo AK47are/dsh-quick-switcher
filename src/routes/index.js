@@ -1,6 +1,7 @@
 /* Route table and dispatch. */
 
 import { createCommandsRoute } from "./commands.js";
+import { createPanelsRoute } from "./panels.js";
 import { createSessionsRoute } from "./sessions.js";
 import { createWorkspacesRoute } from "./workspaces.js";
 
@@ -16,6 +17,7 @@ export function createRoutes() {
   return [
     createWorkspacesRoute(),
     createCommandsRoute(),
+    createPanelsRoute(),
     createSessionsRoute(),
   ].sort((left, right) => right.prefix.length - left.prefix.length);
 }

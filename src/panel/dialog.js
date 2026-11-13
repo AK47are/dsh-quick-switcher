@@ -43,6 +43,8 @@ export function QuickSwitcherDialog({
   store,
   uiWorkspace,
   shortcuts,
+  layout,
+  panels,
   recent,
   t,
   useSessions,
@@ -53,7 +55,10 @@ export function QuickSwitcherDialog({
   const sessionList = useSessions((state) => state);
   const workspaceList = useWorkspaces((state) => state);
   const statuses = useSessionStatus((state) => state);
-  const isPanelActive = usePanelInfo((info) => info.activePanelId !== null);
+  // The id, not just a flag: the panels route marks the page the main area is
+  // showing, while the session list keeps hiding the retained session behind it.
+  const activePanelId = usePanelInfo((info) => info.activePanelId);
+  const isPanelActive = activePanelId !== null;
 
   // Route instances live for one panel mount, so the workspaces token resets
   // when the panel closes instead of leaking into the next open.
@@ -98,6 +103,14 @@ export function QuickSwitcherDialog({
   );
   const commandsLoading = shortcutConfig.status === "loading";
 
+  // The panel registry is owned outside React and changes when a plugin with a
+  // main panel loads or unloads, or when the language switch re-evaluates the
+  // labels.
+  const panelEntries = React.useSyncExternalStore(
+    panels.subscribe,
+    panels.getSnapshot,
+  );
+
   const [query, setQuery] = React.useState("");
   // The caret starts on the first row: the previous session when the access
   // history knows one, otherwise the status leader. Opening the panel never
@@ -125,6 +138,8 @@ export function QuickSwitcherDialog({
         currentId,
         commandEntries,
         commandsLoading,
+        panelEntries,
+        activePanelId,
         t,
         now: Date.now(),
       }),
@@ -135,6 +150,8 @@ export function QuickSwitcherDialog({
       currentId,
       commandEntries,
       commandsLoading,
+      panelEntries,
+      activePanelId,
       t,
     ],
   );
@@ -234,7 +251,22 @@ export function QuickSwitcherDialog({
     }
   };
 
-  const activation = { openSession, startSession };
+  // A main panel belongs to the layout rather than to a workspace: selecting
+  // one swaps the conversation for that panel. The call throws when the panel
+  // unregistered between the list being built and the key press, so the
+  // failure is reported in place instead of closing onto a dead row.
+  const openPanel = (panelId) => {
+    setError(null);
+    try {
+      layout.selectPanel(panelId);
+      return true;
+    } catch {
+      setError(t("panelOpenFailed"));
+      return false;
+    }
+  };
+
+  const activation = { openSession, startSession, openPanel };
   const buildView = (nextQuery) =>
     pickView(routes.current, nextQuery, {
       sessionEntries: entries,
@@ -242,6 +274,8 @@ export function QuickSwitcherDialog({
       currentId,
       commandEntries,
       commandsLoading,
+      panelEntries,
+      activePanelId,
       t,
       now: Date.now(),
     });

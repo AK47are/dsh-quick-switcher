@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node scripts/build.js",
     "check": "node scripts/build.js --check",
+    "prepare": "node scripts/build.js",
     "test": "node --test tests"
   },
   "devDependencies": {

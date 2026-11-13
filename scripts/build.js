@@ -36,8 +36,18 @@ ${body}
 
 if (process.argv.includes("--check")) {
   const normalize = (text) => text.replace(/\r\n/gu, "\n");
-  const current = readFileSync(target, "utf8");
-  if (normalize(current) !== normalize(output)) {
+  let current;
+  try {
+    current = readFileSync(target, "utf8");
+  } catch (error) {
+    // The artifact is not tracked by git, so a fresh clone has no client.js yet.
+    // Report that as a missing build rather than letting a bare ENOENT escape.
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (current === undefined) {
+    console.error("client.js is missing; run npm run build");
+    process.exitCode = 1;
+  } else if (normalize(current) !== normalize(output)) {
     console.error("client.js is out of date; run npm run build");
     process.exitCode = 1;
   } else {

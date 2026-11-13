@@ -70,14 +70,21 @@ DSH 的会话列表按工作区分组，工作区一多就很难只用鼠标定�
 
 ## 构建
 
-client.js 由 src/ 生成，不要手改。首次开发先安装依赖，改完源码后重新构建：
+client.js 由 esbuild 从 src/plugin.js 打包成单个 classic script，不入库，也不要手改。克隆仓库后先安装依赖，prepare 会顺带把它生成出来：
 
 ```
 npm install
+```
+
+改完源码后重新构建：
+
+```
 npm run build
 ```
 
-npm run check 验证提交的 client.js 与源码一致，npm test 跑搜索、命令、会话状态、工作区、主面板、输入历史与文件路由的单元测试。
+npm run check 校验 client.js 与 src/ 是否一致，产物缺失时报缺失、落后时报落后；npm test 跑搜索、命令、会话状态、工作区、主面板、输入历史与文件路由的单元测试。
+
+本目录以 link: 方式装进 profile 时，pnpm 只建符号链接，不跑依赖的生命周期脚本，prepare 因此不会触发。这种情况下装完依赖再手动跑一次 npm run build，否则 DSH 的客户端加载器会因为缺产物直接启动失败。
 
 ## 扩展
 
@@ -102,6 +109,8 @@ npm run check 验证提交的 client.js 与源码一致，npm test 跑搜索、�
 ## 安装
 
 在插件管理器里安装本目录，或者把本目录作为本地 bundle 安装到当前 profile。安装后刷新页面，命令注册与面板同时生效。
+
+本地安装走符号链接，插件管理器不会替你构建。克隆或更新源码后先跑 npm install，再确认 client.js 存在，然后刷新页面。
 
 ## 限制
 

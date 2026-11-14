@@ -16,8 +16,8 @@ export const STYLE = `
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
-        width: min(560px, calc(100vw - 32px));
-        max-height: min(560px, 72vh);
+        width: min(760px, calc(100vw - 32px));
+        max-height: min(760px, 80vh);
         overflow: hidden;
         border: 0.5px solid var(--dsw-alias-border-l1);
         border-radius: 16px;
@@ -87,8 +87,8 @@ export const STYLE = `
         display: flex;
         align-items: center;
         gap: 12px;
-        min-height: 38px;
-        padding: 3px 10px;
+        min-height: 44px;
+        padding: 4px 10px;
         border-radius: 10px;
         cursor: pointer;
       }
@@ -113,14 +113,14 @@ export const STYLE = `
         display: flex;
         flex: 1 1 auto;
         flex-direction: column;
-        gap: 0;
+        gap: 1px;
         min-width: 0;
       }
       .dqs-title {
         overflow: hidden;
         color: var(--dsw-alias-label-primary);
         font-size: 14px;
-        line-height: 18px;
+        line-height: 20px;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -130,8 +130,8 @@ export const STYLE = `
         gap: 8px;
         min-width: 0;
         color: var(--dsw-alias-label-secondary);
-        font-size: 11px;
-        line-height: 14px;
+        font-size: 12px;
+        line-height: 16px;
       }
       .dqs-workspace {
         overflow: hidden;

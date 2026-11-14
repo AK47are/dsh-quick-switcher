@@ -95,6 +95,20 @@ export const STYLE = `
       .dqs-row-selected {
         background: var(--dsw-alias-bg-layer-2);
       }
+      .dqs-jump {
+        flex: 0 0 auto;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: var(--dsw-alias-bg-layer-2);
+        color: var(--dsw-alias-label-secondary);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        line-height: 17px;
+        white-space: nowrap;
+      }
+      .dqs-row-selected .dqs-jump {
+        background: var(--dsw-alias-bg-overlay);
+      }
       .dqs-row-main {
         display: flex;
         flex: 1 1 auto;

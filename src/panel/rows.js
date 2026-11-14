@@ -123,7 +123,8 @@ export function highlightTitle(text, positions) {
  * One row in the active route's list.
  *
  * A route decides what to show by filling the uniform row shape; the panel
- * only owns selection, icons, status, badges, and click dispatch.
+ * only owns selection, icons, status, badges, click dispatch, and the Alt+digit
+ * hint on the first nine rows.
  *
  * Hover is reported as `pointermove` rather than `mouseenter`: the browser
  * replays enter events for elements that appear under a stationary pointer,
@@ -142,6 +143,7 @@ export function RowView({ row, selected, index, onPointerMove, onActivate, regis
       id: `dqs-option-${index}`,
       role: "option",
       "aria-selected": selected ? "true" : "false",
+      "aria-keyshortcuts": index < 9 ? `Alt+${index + 1}` : undefined,
       className,
       ref: registerRef,
       onPointerMove,
@@ -174,6 +176,13 @@ export function RowView({ row, selected, index, onPointerMove, onActivate, regis
         : null,
       row.badge ? h("span", { className: "dqs-badge" }, row.badge) : null,
       row.trailing ? h("span", { className: "dqs-trailing" }, row.trailing) : null,
+      index < 9
+        ? h(
+            "span",
+            { className: "dqs-jump", "aria-hidden": "true" },
+            `Alt ${index + 1}`,
+          )
+        : null,
     ),
   );
 }

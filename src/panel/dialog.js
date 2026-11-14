@@ -13,6 +13,7 @@ import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createPointerGate, getPointerBaseline } from "../pointer.js";
 import { createRoutes, pickView } from "../routes/index.js";
 import { AskDetail, AskFooter } from "./ask-detail.js";
+import { digitRowIndex } from "./digit-jump.js";
 import { CloseGlyph, RowView, SearchGlyph } from "./rows.js";
 import { focusSidebarPane } from "./rightbar.js";
 import { Hints } from "./hints.js";
@@ -625,8 +626,20 @@ export function QuickSwitcherDialog({
     }
   };
 
-  const activate = (row, shiftKey) => {
-    const runner = shiftKey && row.shiftRun ? row.shiftRun : row.run;
+  /**
+   * Apply a row's primary action.
+   *
+   * The two actions are separate handlers instead of one function taking a
+   * shift flag, so each call site names the action it means, and the alternate
+   * one still falls back to the primary one on rows that have no shiftRun.
+   */
+  const activateRow = (row) => {
+    if (!row.run) return;
+    applyEffect(row.run(activation));
+  };
+
+  const activateShiftRow = (row) => {
+    const runner = row.shiftRun ?? row.run;
     if (!runner) return;
     applyEffect(runner(activation));
   };
@@ -728,11 +741,28 @@ export function QuickSwitcherDialog({
       setSelected(key === "Home" ? 0 : rows.length - 1);
       return;
     }
+    const digitIndex = digitRowIndex(event.nativeEvent ?? event);
+    if (digitIndex !== null) {
+      // Swallow the key even when no such row exists: on macOS Alt+digit types
+      // a symbol, and an out-of-range press must not edit the query.
+      event.preventDefault();
+      event.stopPropagation();
+      const row = rows[digitIndex];
+      if (!row) return;
+      // Moving the caret first leaves it on the row that just ran, which is
+      // what the modes that stay open (history and side questions) show.
+      setSelected(digitIndex);
+      // Shift is ignored on purpose: layouts that need Shift for a plain digit
+      // would otherwise fire the alternate action instead of the primary one.
+      activateRow(row);
+      return;
+    }
     if (key === "Enter") {
       event.preventDefault();
       const row = rows[selected];
       if (!row) return;
-      activate(row, event.shiftKey);
+      if (event.shiftKey) activateShiftRow(row);
+      else activateRow(row);
     }
   };
 
@@ -758,7 +788,8 @@ export function QuickSwitcherDialog({
             if (!hoverGate.current.accept(event.clientX, event.clientY)) return;
             setSelected(index);
           },
-          onActivate: (shiftKey) => activate(row, shiftKey),
+          onActivate: (shiftKey) =>
+            shiftKey ? activateShiftRow(row) : activateRow(row),
           registerRef: (node) => {
             if (node) rowRefs.current.set(row.key, node);
             else rowRefs.current.delete(row.key);

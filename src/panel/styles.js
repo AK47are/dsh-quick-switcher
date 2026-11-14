@@ -87,8 +87,8 @@ export const STYLE = `
         display: flex;
         align-items: center;
         gap: 12px;
-        min-height: 48px;
-        padding: 6px 10px;
+        min-height: 38px;
+        padding: 3px 10px;
         border-radius: 10px;
         cursor: pointer;
       }
@@ -113,14 +113,14 @@ export const STYLE = `
         display: flex;
         flex: 1 1 auto;
         flex-direction: column;
-        gap: 2px;
+        gap: 0;
         min-width: 0;
       }
       .dqs-title {
         overflow: hidden;
         color: var(--dsw-alias-label-primary);
         font-size: 14px;
-        line-height: 21px;
+        line-height: 18px;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
@@ -130,8 +130,8 @@ export const STYLE = `
         gap: 8px;
         min-width: 0;
         color: var(--dsw-alias-label-secondary);
-        font-size: 12px;
-        line-height: 17px;
+        font-size: 11px;
+        line-height: 14px;
       }
       .dqs-workspace {
         overflow: hidden;

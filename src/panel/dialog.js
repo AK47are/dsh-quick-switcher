@@ -1,6 +1,7 @@
 /* Panel shell: input, selection, keyboard, and route dispatch. */
 
 import React from "react";
+import { canCopy, canFork, canRegenerate } from "../ask-store.js";
 import { getAccessStore } from "../data/access.js";
 import {
   buildCommandEntries,
@@ -11,6 +12,7 @@ import { collectSessionEntries } from "../data/sessions.js";
 import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createPointerGate, getPointerBaseline } from "../pointer.js";
 import { createRoutes, pickView } from "../routes/index.js";
+import { AskDetail, AskFooter } from "./ask-detail.js";
 import { CloseGlyph, RowView, SearchGlyph } from "./rows.js";
 import { focusSidebarPane } from "./rightbar.js";
 import { Hints } from "./hints.js";
@@ -22,6 +24,24 @@ const h = React.createElement;
 function firstContentIndex(rows) {
   const index = rows.findIndex((row) => row.action !== true);
   return index < 0 ? 0 : index;
+}
+
+/**
+ * Whether focus sits in a control that consumes plain letters.
+ *
+ * A locked side-question input matches too: it is read-only, but the user can
+ * still select and copy the question there, so C, R, F, and S must stay
+ * letters rather than shortcuts while it has focus.
+ */
+function isEditableTarget(target) {
+  if (target === null || typeof target !== "object") return false;
+  if (target.isContentEditable === true) return true;
+  if (typeof target.closest !== "function") return false;
+  return (
+    target.closest(
+      'input, textarea, select, [contenteditable=""], [contenteditable="true"]',
+    ) !== null
+  );
 }
 
 /**
@@ -43,6 +63,7 @@ function firstContentIndex(rows) {
 export function QuickSwitcherDialog({
   store,
   history,
+  ask,
   seed,
   captureDraft,
   generation,
@@ -74,7 +95,9 @@ export function QuickSwitcherDialog({
   // Route instances live for one panel mount, so the workspaces token resets
   // when the panel closes instead of leaking into the next open.
   const routes = React.useRef(null);
-  if (routes.current === null) routes.current = createRoutes({ notify: bump });
+  if (routes.current === null) {
+    routes.current = createRoutes({ notify: bump, store: ask });
+  }
   React.useEffect(
     () => () => {
       for (const route of routes.current ?? []) route.dispose?.();
@@ -97,6 +120,11 @@ export function QuickSwitcherDialog({
     [sessionList, workspaceList, statuses, isPanelActive, accessTimes],
   );
   const { entries, currentId } = sessionData;
+  // The pending card a side question would be about. It is read from the same
+  // unified status the sidebar uses, so the background sent with a question is
+  // exactly the card the user can see waiting.
+  const pending =
+    currentId === null ? null : statuses?.get?.(currentId)?.pendingInteraction ?? null;
   const workspaceRows = React.useMemo(
     () => collectWorkspaceRows(workspaceList, entries),
     [workspaceList, entries],
@@ -159,6 +187,13 @@ export function QuickSwitcherDialog({
   const [error, setError] = React.useState(null);
   const [notice, setNotice] = React.useState(null);
   const [caretRequest, setCaretRequest] = React.useState(0);
+  // Copy feedback and the fork request are the only side-question state the
+  // shell owns; everything that survives a render lives in the record store.
+  const [askUi, setAskUi] = React.useState({
+    copied: false,
+    copyFailed: false,
+    forking: false,
+  });
 
   // Hover only moves the caret once the pointer really moved. Browsers replay
   // hover events for elements that appear under a stationary pointer, so an
@@ -176,6 +211,7 @@ export function QuickSwitcherDialog({
         sessionEntries: entries,
         workspaceRows,
         currentId,
+        pending,
         commandEntries,
         commandsLoading,
         files,
@@ -190,6 +226,7 @@ export function QuickSwitcherDialog({
       entries,
       workspaceRows,
       currentId,
+      pending,
       commandEntries,
       commandsLoading,
       files,
@@ -201,6 +238,15 @@ export function QuickSwitcherDialog({
     ],
   );
   const rows = view.rows;
+  // A route that renders a component instead of rows owns the list area. The
+  // record is read here rather than carried in the view, so the answer on
+  // screen is the one the store holds at this render, not one captured when
+  // the descriptor was built.
+  const contentShown = view.content !== null && view.content !== undefined;
+  const askRecord =
+    view.content?.kind === "ask" && ask !== undefined
+      ? ask.find(view.content.id)
+      : null;
 
   // Commands ask the store which mode the panel shows, and the edited query is
   // the only truth for that. Republishing the claiming prefix keeps the
@@ -219,6 +265,8 @@ export function QuickSwitcherDialog({
 
   const inputRef = React.useRef(null);
   const closeRef = React.useRef(null);
+  const cardRef = React.useRef(null);
+  const copyTimer = React.useRef(0);
   const previousFocus = React.useRef(null);
   const skipRestore = React.useRef(false);
   const rowRefs = React.useRef(new Map());
@@ -256,6 +304,15 @@ export function QuickSwitcherDialog({
     const end = input.value.length;
     input.setSelectionRange?.(end, end);
   }, [caretRequest]);
+
+  // Leaving the detail puts the caret back in the input, which is again the
+  // only control that can change the query. Entering the detail focuses the
+  // answer itself, so this direction is deliberately one-way.
+  const hadContent = React.useRef(false);
+  React.useEffect(() => {
+    if (hadContent.current && !contentShown) inputRef.current?.focus();
+    hadContent.current = contentShown;
+  }, [contentShown]);
 
   // A command fired while the panel is open reseeds the query in place, so
   // switching to history does not close and remount the surface the user is
@@ -365,11 +422,87 @@ export function QuickSwitcherDialog({
   };
 
   const activation = { openSession, startSession, openPanel };
+
+  /**
+   * Copy the answer and report the outcome next to the button.
+   *
+   * The clipboard API is missing or blocked in some embeds; that is a normal
+   * refusal, so it becomes a visible label instead of an exception.
+   */
+  const copyAnswer = async () => {
+    const text = askRecord?.answer ?? "";
+    if (text === "") return;
+    try {
+      await navigator.clipboard.writeText(text);
+      if (copyTimer.current !== 0) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => {
+        copyTimer.current = 0;
+        setAskUi((value) => ({ ...value, copied: false }));
+      }, 1600);
+      setAskUi((value) => ({ ...value, copied: true, copyFailed: false }));
+    } catch (failure) {
+      console.error("[dsh-quick-switcher] clipboard write failed", failure);
+      setAskUi((value) => ({ ...value, copied: false, copyFailed: true }));
+    }
+  };
+
+  const stopAnswer = () => {
+    if (askRecord === null || ask === undefined) return;
+    ask.stop(askRecord.sessionId, askRecord.id);
+  };
+
+  const regenerateAnswer = () => {
+    if (askRecord === null || ask === undefined) return;
+    ask.regenerate(askRecord.sessionId, askRecord.id);
+  };
+
+  /**
+   * Fork the exchange and follow it into the child session.
+   *
+   * Focus is deliberately not restored: the panel closes because the main area
+   * now shows a different conversation, and handing the caret back to the
+   * pre-panel control would undo that navigation. A failed navigation keeps the
+   * panel open so the error stays readable and the same fork can be retried.
+   */
+  const forkAnswer = async () => {
+    if (askRecord === null || ask === undefined || askUi.forking) return;
+    setAskUi((value) => ({ ...value, forking: true }));
+    setError(null);
+    try {
+      const childId = await ask.fork(askRecord.sessionId, askRecord.id);
+      if (childId === null) return;
+      if (!openSession(childId)) return;
+      close(false);
+    } catch (failure) {
+      console.error("[dsh-quick-switcher] side question fork failed", failure);
+      setError(t("askForkFailed"));
+    } finally {
+      setAskUi((value) => ({ ...value, forking: false }));
+    }
+  };
+
+  // A new answer makes an earlier "已复制" a lie; the record id and its status
+  // are the two events that begin or end one.
+  React.useEffect(() => {
+    setAskUi((value) =>
+      value.copied || value.copyFailed
+        ? { ...value, copied: false, copyFailed: false }
+        : value,
+    );
+  }, [askRecord?.id, askRecord?.status]);
+
+  React.useEffect(
+    () => () => {
+      if (copyTimer.current !== 0) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
   const buildView = (nextQuery) =>
     pickView(routes.current, nextQuery, {
       sessionEntries: entries,
       workspaceRows,
       currentId,
+      pending,
       commandEntries,
       commandsLoading,
       files,
@@ -440,9 +573,9 @@ export function QuickSwitcherDialog({
 
   const loadOlderHistory = () => {
     setError(null);
-    const pending = history.loadOlder();
-    if (pending && typeof pending.catch === "function") {
-      pending.catch(() => setError(t("historyLoadFailed")));
+    const loading = history.loadOlder();
+    if (loading && typeof loading.catch === "function") {
+      loading.catch(() => setError(t("historyLoadFailed")));
     }
   };
 
@@ -483,7 +616,12 @@ export function QuickSwitcherDialog({
         ? nextView.rows.findIndex((row) => row.key === effect.selectedKey)
         : -1;
       setSelected(index >= 0 ? index : firstContentIndex(nextView.rows));
-      setCaretRequest((value) => value + 1);
+      // A detail view focuses its own answer; pulling the caret back to the
+      // input would scroll the answer away and stop the arrow keys from
+      // scrolling it.
+      if (nextView.content === null || nextView.content === undefined) {
+        setCaretRequest((value) => value + 1);
+      }
     }
   };
 
@@ -513,12 +651,68 @@ export function QuickSwitcherDialog({
     }
     if (key === "Tab") {
       event.preventDefault();
-      const focusables = [inputRef.current, closeRef.current].filter(Boolean);
+      // The detail view adds its own focusables (the answer area and the
+      // action buttons), so the cycle is read from the card instead of being
+      // fixed to the input and the close button.
+      const card = cardRef.current;
+      const focusables =
+        card === null
+          ? [inputRef.current, closeRef.current].filter(Boolean)
+          : [...card.querySelectorAll('input, button, [tabindex="0"]')].filter(
+              (node) => node.disabled !== true && node.getClientRects().length > 0,
+            );
       if (focusables.length === 0) return;
       const index = focusables.indexOf(document.activeElement);
       const step = event.shiftKey ? -1 : 1;
       const next = focusables[(index + step + focusables.length) % focusables.length];
       next?.focus();
+      return;
+    }
+    if (contentShown) {
+      // Backspace is the detail's back key. A text selection keeps its native
+      // meaning, so selecting part of the question to copy does not navigate
+      // away when the user then presses it.
+      if (key === "Backspace") {
+        const input = inputRef.current;
+        const hasSelection =
+          input !== null &&
+          document.activeElement === input &&
+          typeof input.selectionStart === "number" &&
+          input.selectionStart !== input.selectionEnd;
+        if (!hasSelection && typeof view.back === "function") {
+          event.preventDefault();
+          view.back();
+        }
+        return;
+      }
+      // Letters stay letters in an input, even the locked one.
+      if (isEditableTarget(event.target)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const letter = key.toLowerCase();
+      if (letter === "s" && askRecord?.status === "running") {
+        event.preventDefault();
+        stopAnswer();
+        return;
+      }
+      if (letter === "c" && askRecord !== null && canCopy(askRecord)) {
+        event.preventDefault();
+        void copyAnswer();
+        return;
+      }
+      if (letter === "r" && askRecord !== null && canRegenerate(askRecord)) {
+        event.preventDefault();
+        regenerateAnswer();
+        return;
+      }
+      if (
+        letter === "f" &&
+        askRecord !== null &&
+        canFork(askRecord) &&
+        !askUi.forking
+      ) {
+        event.preventDefault();
+        void forkAnswer();
+      }
       return;
     }
     if (key === "ArrowDown" || key === "ArrowUp") {
@@ -544,6 +738,7 @@ export function QuickSwitcherDialog({
 
   const hints = [{ keys: ["↑", "↓"], label: t("hintSelect") }, ...(view.hints ?? [])];
   const activeId = rows.length === 0 ? undefined : `dqs-option-${selected}`;
+  const locked = view.inputLocked === true;
 
   const children = [];
   if (rows.length === 0) {
@@ -592,6 +787,7 @@ export function QuickSwitcherDialog({
       "div",
       {
         className: "dqs-card",
+        ref: cardRef,
         role: "dialog",
         "aria-modal": "true",
         "aria-labelledby": titleId,
@@ -611,11 +807,15 @@ export function QuickSwitcherDialog({
           onChange: (event) => onQueryChange(event.target.value),
           placeholder: view.placeholder,
           "aria-label": view.searchAria,
-          role: "combobox",
-          "aria-expanded": "true",
-          "aria-controls": listId,
-          "aria-activedescendant": activeId,
-          "aria-autocomplete": "list",
+          // A locked input is a plain text field: it controls no list, and
+          // claiming to be a combobox would promise arrow-key options that are
+          // not there while the detail is open.
+          role: locked ? "textbox" : "combobox",
+          "aria-expanded": locked ? undefined : "true",
+          "aria-controls": locked ? undefined : listId,
+          "aria-activedescendant": locked ? undefined : activeId,
+          "aria-autocomplete": locked ? undefined : "list",
+          readOnly: locked,
           autoComplete: "off",
           spellCheck: false,
         }),
@@ -631,23 +831,46 @@ export function QuickSwitcherDialog({
           h(CloseGlyph),
         ),
       ),
-      h(
-        "div",
-        {
-          className: "dqs-list",
-          id: listId,
-          role: "listbox",
-          "aria-label": view.listLabel,
-        },
-        children,
-      ),
+      contentShown
+        ? h(
+            "div",
+            { className: "dqs-content" },
+            askRecord === null
+              ? null
+              : h(AskDetail, { key: askRecord.id, record: askRecord, t }),
+          )
+        : h(
+            "div",
+            {
+              className: "dqs-list",
+              id: listId,
+              role: "listbox",
+              "aria-label": view.listLabel,
+            },
+            children,
+          ),
       notice === null ? null : h("div", { className: "dqs-notice", role: "status" }, notice),
       error === null ? null : h("div", { className: "dqs-error", role: "alert" }, error),
       h(
         "div",
         { className: "dqs-footer" },
-        h(Hints, { hints }),
-        h("div", { className: "dqs-count" }, view.count),
+        contentShown && askRecord !== null
+          ? h(AskFooter, {
+              record: askRecord,
+              t,
+              ui: askUi,
+              actions: {
+                copy: copyAnswer,
+                regenerate: regenerateAnswer,
+                fork: forkAnswer,
+                stop: stopAnswer,
+                back: view.back,
+              },
+            })
+          : [
+              h(Hints, { key: "hints", hints }),
+              h("div", { key: "count", className: "dqs-count" }, view.count),
+            ],
       ),
     ),
   );

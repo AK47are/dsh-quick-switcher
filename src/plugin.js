@@ -1,5 +1,6 @@
 /* Plugin face: locale, commands, and the two overlay entries. */
 
+import { createAskStore } from "./ask-store.js";
 import { createHistoryStore } from "./history-store.js";
 import { createOpenStore } from "./open-store.js";
 import { fileAddress } from "./data/files.js";
@@ -139,6 +140,11 @@ export function apply(ctx) {
   const t = ctx.locale.bind(NS);
   const store = createOpenStore();
   const historyStore = createHistoryStore();
+  // Side-question records outlive the overlay: closing the panel aborts the
+  // running answer but must not forget what was already asked. Only a plugin
+  // unload drops them, which is also when every request is aborted.
+  const askStore = createAskStore({ translate: t });
+  ctx.effect(() => () => askStore.dispose(), "quick-switcher: side questions");
   const recent = createRecentCommands();
   const files = createFileCapability(ctx);
   const panels = createPanelList(ctx);
@@ -266,6 +272,7 @@ export function apply(ctx) {
         inject: () => ({
           store,
           history: historyStore,
+          ask: askStore,
           uiWorkspace: ctx.uiWorkspace,
           shortcuts: ctx.shortcuts,
           files,

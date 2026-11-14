@@ -1,6 +1,6 @@
 {
   "name": "dsh-quick-switcher",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
   "devDependencies": {
     "esbuild": "0.28.2"
   },
-  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令、回填输入历史、跳到主面板、搜索工作区文件。",
+  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令、回填输入历史、跳到主面板、搜索工作区文件，并可就当前会话侧问一个不进入主对话的问题。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

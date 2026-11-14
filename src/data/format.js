@@ -44,6 +44,25 @@ export function relativeTime(millis, t, now) {
 }
 
 /**
+ * Format one usage object for the side-question status row.
+ *
+ * Providers disagree about which counters they report, so each field is summed
+ * with a zero fallback. An empty object renders nothing at all: the row must
+ * not claim "0 0" for a provider that simply omits usage.
+ */
+export function formatUsage(usage, t) {
+  if (usage === null || typeof usage !== "object") return "";
+  const input =
+    Number(usage.inputTokens ?? 0) +
+    Number(usage.cacheReadTokens ?? 0) +
+    Number(usage.cacheWriteTokens ?? 0);
+  const output = Number(usage.outputTokens ?? 0);
+  if (!Number.isFinite(input) || !Number.isFinite(output)) return "";
+  if (input === 0 && output === 0) return "";
+  return `${t("usageInput")} ${input} · ${t("usageOutput")} ${output}`;
+}
+
+/**
  * Relative time, or the sidebar's compact pending label while waiting.
  *
  * The switcher sorts empty-query rows by `recentAt` (last time the session

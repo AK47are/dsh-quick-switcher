@@ -24,6 +24,7 @@ const h = React.createElement;
 export function QuickSwitcher({
   store,
   history,
+  ask,
   uiWorkspace,
   shortcuts,
   files,
@@ -53,6 +54,7 @@ export function QuickSwitcher({
     ? h(QuickSwitcherDialog, {
         store,
         history,
+        ask,
         seed: state.seed,
         captureDraft: state.captureDraft,
         generation: state.generation,

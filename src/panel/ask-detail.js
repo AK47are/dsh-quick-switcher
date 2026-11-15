@@ -7,18 +7,25 @@ import { canCopy, canFork, canRegenerate, isRunning, statusLabelKey } from "../a
 
 const h = React.createElement;
 
-/** Small text button with the shortcut printed next to its label. */
-function ActionButton({ label, keyLabel, onClick, disabled }) {
+/**
+ * One action in the detail bar: the panel's keycap plus a clickable label.
+ *
+ * The key reuses the keycap class the list footer already uses, so both bars
+ * share one hint language and the panel font instead of the monospace `kbd`
+ * default.
+ */
+function ActionButton({ label, keyLabel, shortcut, onClick, disabled }) {
   return h(
     "button",
     {
       type: "button",
       className: "dqs-ask-btn",
       disabled: disabled === true,
+      "aria-keyshortcuts": shortcut,
       onClick,
     },
+    h("kbd", { className: "dqs-keycap" }, keyLabel),
     h("span", null, label),
-    h("kbd", { className: "dqs-ask-key", "aria-hidden": "true" }, keyLabel),
   );
 }
 
@@ -137,8 +144,10 @@ export function AskDetail({ record, t }) {
  * The detail's action bar.
  *
  * It replaces the panel's default hints and count. Which buttons exist is
- * decided by the record's state, but every action is also reachable by letter
- * from the answer area, so a keyboard user never has to tab here.
+ * decided by the record's state, and every action is also reachable by letter,
+ * so a keyboard user never has to tab here. The bar reuses the list footer's
+ * keycap hints: actions on the left, the close hint on the right, and no
+ * button frame of its own.
  */
 export function AskFooter({ record, t, ui, actions }) {
   const running = isRunning(record);
@@ -149,6 +158,7 @@ export function AskFooter({ record, t, ui, actions }) {
         key: "stop",
         label: t("askStop"),
         keyLabel: "S",
+        shortcut: "s",
         onClick: actions.stop,
       }),
     );
@@ -164,6 +174,7 @@ export function AskFooter({ record, t, ui, actions }) {
         key: "copy",
         label,
         keyLabel: "C",
+        shortcut: "c",
         onClick: actions.copy,
       }),
     );
@@ -174,6 +185,7 @@ export function AskFooter({ record, t, ui, actions }) {
         key: "regenerate",
         label: t("askRegenerate"),
         keyLabel: "R",
+        shortcut: "r",
         onClick: actions.regenerate,
       }),
     );
@@ -184,6 +196,7 @@ export function AskFooter({ record, t, ui, actions }) {
         key: "fork",
         label: ui.forking ? t("askForking") : t("askFork"),
         keyLabel: "F",
+        shortcut: "f",
         onClick: actions.fork,
         disabled: ui.forking,
       }),
@@ -193,11 +206,14 @@ export function AskFooter({ record, t, ui, actions }) {
     h(ActionButton, {
       key: "back",
       label: t("askBack"),
-      keyLabel: "Backspace",
+      keyLabel: "I",
+      shortcut: "i",
       onClick: actions.back,
     }),
   );
 
+  // The actions sit side by side like the list footer's hints: the keycap and
+  // the label inside each action, one gap between actions.
   return h(
     "div",
     { className: "dqs-ask-footer" },
@@ -205,7 +221,7 @@ export function AskFooter({ record, t, ui, actions }) {
     h(
       "span",
       { className: "dqs-ask-hint" },
-      h("kbd", { className: "dqs-ask-key", "aria-hidden": "true" }, "Esc"),
+      h("kbd", { className: "dqs-keycap" }, "Esc"),
       t("hintClose"),
     ),
   );

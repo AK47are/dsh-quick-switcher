@@ -1,7 +1,7 @@
 /* Panel shell: input, selection, keyboard, and route dispatch. */
 
 import React from "react";
-import { canCopy, canFork, canRegenerate } from "../ask-store.js";
+import { canCopy, canFork, canRegenerate, isRunning } from "../ask-store.js";
 import { getAccessStore } from "../data/access.js";
 import {
   buildCommandEntries,
@@ -13,6 +13,7 @@ import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createPointerGate, getPointerBaseline } from "../pointer.js";
 import { createRoutes, pickView } from "../routes/index.js";
 import { AskDetail, AskFooter } from "./ask-detail.js";
+import { detailKeyAction } from "./ask-keys.js";
 import { digitRowIndex } from "./digit-jump.js";
 import { CloseGlyph, RowView, SearchGlyph } from "./rows.js";
 import { focusSidebarPane } from "./rightbar.js";
@@ -682,50 +683,25 @@ export function QuickSwitcherDialog({
       return;
     }
     if (contentShown) {
-      // Backspace is the detail's back key. A text selection keeps its native
-      // meaning, so selecting part of the question to copy does not navigate
-      // away when the user then presses it.
-      if (key === "Backspace") {
-        const input = inputRef.current;
-        const hasSelection =
-          input !== null &&
-          document.activeElement === input &&
-          typeof input.selectionStart === "number" &&
-          input.selectionStart !== input.selectionEnd;
-        if (!hasSelection && typeof view.back === "function") {
-          event.preventDefault();
-          view.back();
-        }
-        return;
-      }
-      // Letters stay letters in an input, even the locked one.
-      if (isEditableTarget(event.target)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const letter = key.toLowerCase();
-      if (letter === "s" && askRecord?.status === "running") {
-        event.preventDefault();
-        stopAnswer();
-        return;
-      }
-      if (letter === "c" && askRecord !== null && canCopy(askRecord)) {
-        event.preventDefault();
-        void copyAnswer();
-        return;
-      }
-      if (letter === "r" && askRecord !== null && canRegenerate(askRecord)) {
-        event.preventDefault();
-        regenerateAnswer();
-        return;
-      }
-      if (
-        letter === "f" &&
-        askRecord !== null &&
-        canFork(askRecord) &&
-        !askUi.forking
-      ) {
-        event.preventDefault();
-        void forkAnswer();
-      }
+      // The detail's letters are routed by a pure helper so the contract
+      // (i returns, Backspace does not, the locked input keeps C/R/F/S as
+      // letters) stays testable outside React.
+      const action = detailKeyAction(event.nativeEvent ?? event, {
+        hasBack: typeof view.back === "function",
+        isEditable: isEditableTarget(event.target),
+        isRunning: isRunning(askRecord),
+        canCopy: canCopy(askRecord),
+        canRegenerate: canRegenerate(askRecord),
+        canFork: canFork(askRecord),
+        isForking: askUi.forking,
+      });
+      if (action === null) return;
+      event.preventDefault();
+      if (action === "back") view.back?.();
+      else if (action === "stop") stopAnswer();
+      else if (action === "copy") void copyAnswer();
+      else if (action === "regenerate") regenerateAnswer();
+      else if (action === "fork") void forkAnswer();
       return;
     }
     if (key === "ArrowDown" || key === "ArrowUp") {

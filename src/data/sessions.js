@@ -1,6 +1,7 @@
 /* Session projections shared by the sidebar and the switcher. */
 
 import { cleanTitle, toMillis } from "./format.js";
+import { idKeyOf, shortIdOf } from "./ids.js";
 
 /**
  * Pending interactions that the sidebar projects as a warning dot.
@@ -172,6 +173,10 @@ function stateRank(status) {
  * therefore absent from its own status position. Search results keep the
  * route's relevance order instead; this list is the base for both, so its
  * order is the only tie the routes inherit.
+ *
+ * A row also carries the canonical id key and the short code derived from it.
+ * The row renders the short code and the search compares the full key, so both
+ * read the same normalization and a code on screen always stays searchable.
  */
 export function collectSessionEntries(
   sessionList,
@@ -214,6 +219,10 @@ export function collectSessionEntries(
     const lastAccessAt = accessTimes?.get?.(id) ?? 0;
     entries.push({
       id,
+      // The row shows the short code and the search compares the full key, so
+      // both come from one normalization instead of two ad-hoc transformations.
+      idKey: idKeyOf(id),
+      shortId: shortIdOf(id),
       title,
       titleLower: title.toLocaleLowerCase(),
       workspace: workspace?.title ?? "",

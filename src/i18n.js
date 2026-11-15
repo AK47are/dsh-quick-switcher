@@ -3,7 +3,7 @@
 export const zh = {
   title: "快速切换器",
   commandLabel: "打开快速切换器",
-  placeholder: "搜索会话标题、工作区或路径",
+  placeholder: "搜索会话标题、工作区、路径或会话 ID",
   searchAria: "搜索会话",
   listLabel: "会话列表",
   close: "关闭快速切换器",
@@ -137,7 +137,7 @@ export const zh = {
 export const en = {
   title: "Quick switcher",
   commandLabel: "Open quick switcher",
-  placeholder: "Search by title, workspace, or path",
+  placeholder: "Search by title, workspace, path, or session ID",
   searchAria: "Search sessions",
   listLabel: "Sessions",
   close: "Close quick switcher",

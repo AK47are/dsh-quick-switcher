@@ -26,6 +26,13 @@ export function sessionRow(entry, ctx, { showWorkspace = false, positions = null
       className: status.compactKey === null ? "dqs-time" : "dqs-time dqs-time-compact",
     });
   }
+  // The short id is the visible half of the session id: it explains why an id
+  // query kept this row and lets the user compare it with a copied id. It sits
+  // after the time so workspace and recency keep their usual place, and a row
+  // whose id is too short to search renders no code at all.
+  if (entry.shortId) {
+    meta.push({ text: entry.shortId, className: "dqs-session-id" });
+  }
   return {
     key: `s:${entry.id}`,
     title: entry.title,

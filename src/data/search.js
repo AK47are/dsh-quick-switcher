@@ -1,5 +1,7 @@
 /* Whole-query fuzzy ranking shared by every route. */
 
+import { ID_PREFIX_MIN, idKeyOf } from "./ids.js";
+
 export const RESULT_LIMIT = 50;
 
 /**
@@ -163,6 +165,12 @@ export function fuzzyMatch(text, query) {
  * highlight. Empty input keeps the route's own order; every route supplies its
  * base order before calling this function.
  *
+ * `idKey` is an optional second secondary field with its own rule: a query of
+ * at least `ID_PREFIX_MIN` characters matches when it is a prefix, so a pasted
+ * session id never competes as a fuzzy subsequence and a one-letter query
+ * cannot flood the list with every uuid. The prefix hit scores like a
+ * contiguous start alignment and keeps the same penalty and no highlight.
+ *
  * `limit` defaults to the panel's shared result cap. History raises it because
  * one prompt row is a single line and the route caps its own collection first.
  */
@@ -177,6 +185,10 @@ export function filterEntries(entries, query, limit = RESULT_LIMIT) {
   }
 
   const needle = compact(trimmed).characters;
+  // The id's own normalization strips the `session-` prefix and the hyphens,
+  // so a pasted full id, a bare uuid, and the row's short code agree here.
+  const idText = idKeyOf(trimmed);
+  const idNeedle = [...idText];
   if (needle.length === 0) {
     return entries
       .slice(0, cap)
@@ -196,6 +208,25 @@ export function filterEntries(entries, query, limit = RESULT_LIMIT) {
         score: primary.score,
       });
       continue;
+    }
+    // A pasted id is one contiguous run, so it gets a prefix rule rather than
+    // the fuzzy alignment. The floor keeps a stray letter from hitting most
+    // uuids, and head-only matching keeps the hit verifiable against the short
+    // code the row shows. Id hits stay secondary, so a title hit always leads.
+    if (
+      idNeedle.length >= ID_PREFIX_MIN &&
+      typeof entry.idKey === "string" &&
+      entry.idKey.startsWith(idText)
+    ) {
+      const hit = matchCompact(compact(entry.idKey), idNeedle);
+      if (hit !== null) {
+        matched.push({
+          entry,
+          positions: new Set(),
+          score: hit.score - SECONDARY_PENALTY,
+        });
+        continue;
+      }
     }
     const secondary = matchCompact(compact(entry.metaLower ?? ""), needle);
     if (secondary !== null) {

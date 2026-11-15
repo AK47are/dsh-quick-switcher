@@ -199,6 +199,11 @@ export const STYLE = `
         color: var(--dsw-alias-label-tertiary);
         opacity: 1;
       }
+      .dqs-session-id {
+        flex: 0 0 auto;
+        color: var(--dsw-alias-label-tertiary);
+        font-variant-numeric: tabular-nums;
+      }
       .dqs-status {
         display: flex;
         flex: 0 0 auto;

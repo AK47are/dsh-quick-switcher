@@ -237,3 +237,18 @@ test("no access history means no pin", () => {
   );
   assert.ok(entries.every((entry) => entry.pinned === false));
 });
+
+test("entries carry the canonical id key and the short code", () => {
+  const id = "session-63cb1fd1-27b3-4b86-9f99-1fc7d8937ffa";
+  const list = listOf([session({ id, title: "Tracked", updatedAt: 100 })]);
+  const { entries } = collectSessionEntries(list, emptyWorkspaces, new Map(), false);
+  assert.equal(entries[0].idKey, "63cb1fd127b34b869f991fc7d8937ffa");
+  assert.equal(entries[0].shortId, "63cb1fd1");
+});
+
+test("an id too short to search shows no short code", () => {
+  const list = listOf([session({ id: "ab", title: "Tiny", updatedAt: 100 })]);
+  const { entries } = collectSessionEntries(list, emptyWorkspaces, new Map(), false);
+  assert.equal(entries[0].idKey, "ab");
+  assert.equal(entries[0].shortId, "");
+});

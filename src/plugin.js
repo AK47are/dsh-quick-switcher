@@ -9,11 +9,14 @@ import { createRecentCommands } from "./data/recent.js";
 import { en, zh } from "./i18n.js";
 import { HistoryBridge } from "./panel/history-bridge.js";
 import { QuickSwitcher } from "./panel/quick-switcher.js";
+import { SettingsSection } from "./panel/settings-page.js";
+import { preferences } from "./preferences.js";
 import { startPointerBaseline } from "./pointer.js";
 
 const NS = "dsh-quick-switcher";
 const COMMAND_ID = "quickSwitcher.open";
 const HISTORY_COMMAND_ID = "quickSwitcher.history";
+const SETTINGS_ORDER = 60;
 
 export const inject = [
   "slots",
@@ -141,9 +144,17 @@ export function apply(ctx) {
   const historyStore = createHistoryStore();
   // Side-question records outlive the overlay: closing the panel aborts the
   // running answer but must not forget what was already asked. Only a plugin
-  // unload drops them, which is also when every request is aborted.
-  const askStore = createAskStore({ translate: t });
-  ctx.effect(() => () => askStore.dispose(), "quick-switcher: side questions");
+  // unload drops them, which is also when every request is aborted. The
+  // attachment preference is captured when a question is asked, so a setting
+  // change applies to the next question rather than rewriting an old record.
+  const askStore = createAskStore({
+    translate: t,
+    includeAttachments: () => preferences.getSnapshot().includeAttachments,
+  });
+  ctx.effect(() => () => {
+    askStore.dispose();
+    preferences.dispose();
+  }, "quick-switcher: side questions");
   const recent = createRecentCommands();
   const files = createFileCapability(ctx);
   const panels = createPanelList(ctx);
@@ -214,6 +225,23 @@ export function apply(ctx) {
             : { status: "blocked", reason: t("historyNoSession") },
       }),
     "quick-switcher: history command",
+  );
+
+  // The settings page owns one switch: whether a side question carries images
+  // and files. The shell mounts this section only when the web profile provides
+  // the settings slot, so a host without it keeps every other feature.
+  ctx.slots.inject("settings.section", () =>
+    ctx.slots.register(
+      {
+        name: "settings.section",
+        id: "quick-switcher",
+        order: SETTINGS_ORDER,
+        label: () => t("settingsNav"),
+        locale: NS,
+        inject: () => ({ preferences }),
+      },
+      SettingsSection,
+    ),
   );
 
   // The panel is a root overlay and cannot read a session. This bridge sits in

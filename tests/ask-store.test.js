@@ -177,6 +177,36 @@ test("regenerating clears the answer and asks the same question again", async ()
   assert.equal(store.find(record.id).status, "done");
   assert.equal(seen.length, 2);
   assert.equal(seen[1].body.question, "q");
+  assert.equal(seen[0].body.includeAttachments, true);
+  assert.equal(seen[1].body.includeAttachments, true);
+});
+
+test("the attachment preference is captured when the question is asked", async () => {
+  let include = false;
+  const seen = [];
+  const store = createAskStore({
+    request: async (path, body) => {
+      seen.push({ path, body });
+      return responseOf(heldStream(sse({ type: "done" })));
+    },
+    now: () => 0,
+    includeAttachments: () => include,
+  });
+
+  const record = store.ask("s1", "q");
+  await flush();
+  assert.equal(seen[0].body.includeAttachments, false);
+
+  // Changing the setting later must not rewrite an existing record.
+  include = true;
+  assert.equal(store.regenerate("s1", record.id), true);
+  await flush();
+  assert.equal(seen[1].body.includeAttachments, false);
+
+  const next = store.ask("s1", "q2");
+  await flush();
+  assert.equal(store.find(next.id).includeAttachments, true);
+  assert.equal(seen[2].body.includeAttachments, true);
 });
 
 test("streamed text is kept on every chunk while notifications are throttled", async () => {

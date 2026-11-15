@@ -125,6 +125,7 @@ export function createAskStore({
   request = postJson,
   now = Date.now,
   translate = (key) => key,
+  includeAttachments = () => true,
 } = {}) {
   /** Newest first. Every mutation replaces the record object, never edits it. */
   const items = [];
@@ -229,6 +230,9 @@ export function createAskStore({
       answer: "",
       context: typeof context?.text === "string" ? context.text : "",
       contextLabel: typeof context?.label === "string" ? context.label : "",
+      // The preference is captured at question time, so regenerate replays the
+      // same snapshot policy instead of silently adopting a newer setting.
+      includeAttachments: includeAttachments() !== false,
       model: "",
       usage: null,
       status: "running",
@@ -256,7 +260,11 @@ export function createAskStore({
   async function runStream(id, controller) {
     const record = find(id);
     if (record === null) return;
-    const body = { sessionId: record.sessionId, question: record.question };
+    const body = {
+      sessionId: record.sessionId,
+      question: record.question,
+      includeAttachments: record.includeAttachments,
+    };
     if (record.context !== "") body.context = record.context;
     try {
       const response = await request(ASK_PATH, body, controller.signal);

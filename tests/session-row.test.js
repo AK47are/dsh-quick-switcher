@@ -45,3 +45,15 @@ test("an id too short to search renders no code", () => {
   const row = sessionRow({ ...entry, shortId: "" }, { t, now: 0 });
   assert.deepEqual(row.meta, []);
 });
+
+test("the pinned row explains itself and the current marker leads", () => {
+  assert.equal(sessionRow({ ...entry, pinned: true }, { t, now: 0 }).badge, "previous");
+  assert.equal(sessionRow({ ...entry, current: true }, { t, now: 0 }).badge, "current");
+  // The data layer keeps the current session out of the pin; if both flags
+  // ever arrive, the current marker is the one that wins.
+  assert.equal(
+    sessionRow({ ...entry, current: true, pinned: true }, { t, now: 0 }).badge,
+    "current",
+  );
+  assert.equal(sessionRow(entry, { t, now: 0 }).badge, null);
+});

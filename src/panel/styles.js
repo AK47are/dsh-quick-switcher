@@ -234,6 +234,9 @@ export const STYLE = `
         font-size: 11px;
         line-height: 17px;
       }
+      .dqs-row-selected .dqs-badge {
+        background: var(--dsw-alias-bg-overlay);
+      }
       .dqs-mark {
         background: transparent;
         color: var(--dsw-alias-brand-primary);

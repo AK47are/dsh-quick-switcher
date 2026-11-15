@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Quick switcher",
-    "description": "A unified search surface that switches sessions, browses workspaces, runs application commands, refills the input from sent prompts, jumps to a main panel such as Plugins or Automation tasks, opens workspace files in the Sidebar from @, and answers a side question about the current session from ?. Opens with Ctrl+Shift+K by default; input history is unbound."
+    "description": "A unified search surface that switches sessions, browses workspaces, runs application commands, refills the input from sent prompts and answers to the agent's questions, jumps to a main panel such as Plugins or Automation tasks, opens workspace files in the Sidebar from @, and answers a side question about the current session from ?. Opens with Ctrl+Shift+K by default; input history is unbound."
   }
 }

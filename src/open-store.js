@@ -14,12 +14,6 @@
  * `prefix` is the route prefix the open panel is actually showing. The dialog
  * republishes it on every query change, so a command decides from the current
  * mode rather than from the seed the panel opened with.
- *
- * `captureDraft` tells the dialog whether the draft row should take the
- * composer's current text. The slash command turns it off because its own
- * token is still the last published draft when the panel mounts: the input
- * removes the token synchronously, but the bridge only republishes after the
- * next render, and a "/history" draft row would be a lie.
  */
 const PREFIXES = ["!", ">", "+"];
 
@@ -33,7 +27,6 @@ export function createOpenStore() {
     open: false,
     seed: "",
     prefix: "",
-    captureDraft: true,
     generation: 0,
   };
   const listeners = new Set();
@@ -42,7 +35,6 @@ export function createOpenStore() {
       state.open === next.open &&
       state.seed === next.seed &&
       state.prefix === next.prefix &&
-      state.captureDraft === next.captureDraft &&
       state.generation === next.generation
     ) {
       return;
@@ -50,12 +42,11 @@ export function createOpenStore() {
     state = next;
     for (const listener of [...listeners]) listener();
   };
-  const open = (seed = "", captureDraft = true) =>
+  const open = (seed = "") =>
     publish({
       open: true,
       seed,
       prefix: seedPrefix(seed),
-      captureDraft,
       generation: state.generation + 1,
     });
   const close = () => {
@@ -64,7 +55,6 @@ export function createOpenStore() {
       open: false,
       seed: "",
       prefix: "",
-      captureDraft: true,
       generation: state.generation + 1,
     });
   };
@@ -91,9 +81,7 @@ export function createOpenStore() {
      * already in history mode closes it; from any other mode it reseeds the
      * same panel instead of closing and losing the open surface.
      */
-    requestHistory: (captureDraft = true) =>
-      state.open && state.prefix === "!"
-        ? close()
-        : open("!", captureDraft),
+    requestHistory: () =>
+      state.open && state.prefix === "!" ? close() : open("!"),
   };
 }

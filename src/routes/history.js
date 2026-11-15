@@ -1,4 +1,4 @@
-/* "!" route: sent prompts from the current session, newest first. */
+/* "!" route: sent prompts and ask answers from the current session, newest first. */
 
 import {
   HISTORY_LIMIT,
@@ -8,6 +8,16 @@ import {
 } from "../data/history.js";
 import { relativeTime } from "../data/format.js";
 import { filterEntries } from "../data/search.js";
+
+/**
+ * The word a row needs, if any: a steering prompt is an interruption, and an
+ * answer is a recorded reply rather than a prompt; ordinary prompts need none.
+ */
+function badgeOf(entry, t) {
+  if (entry.kind === "steering") return t("historySteeringBadge");
+  if (entry.kind === "answer") return t("historyAnswerBadge");
+  return null;
+}
 
 /**
  * The history route projects the bridge's published window into rows and hands
@@ -32,9 +42,10 @@ export function createHistoryRoute() {
       const draft = String(history.draft ?? "").trim();
       const filter = parsed.filter.trim();
 
-      // Newest first, adjacent retries folded. A draft that already equals the
-      // newest prompt would otherwise appear twice, so the history copy is
-      // dropped and the draft row stands for both.
+      // Newest first, adjacent prompt retries folded; an answer is its own
+      // reply and is never folded. A draft that already equals the newest
+      // entry would otherwise appear twice, so the history copy is dropped and
+      // the draft row stands for both.
       const entries = historyEntries(prompts, HISTORY_LIMIT);
       const newest = entries[0];
       const visible = draft !== "" && newest !== undefined && newest.text === draft
@@ -63,7 +74,7 @@ export function createHistoryRoute() {
           title: entry.title,
           positions,
           meta,
-          badge: entry.kind === "steering" ? t("historySteeringBadge") : null,
+          badge: badgeOf(entry, t),
           className: "dqs-history-row",
           run: frozen ? undefined : () => ({ type: "history", text: entry.text }),
         });

@@ -56,7 +56,6 @@ export function QuickSwitcher({
         history,
         ask,
         seed: state.seed,
-        captureDraft: state.captureDraft,
         generation: state.generation,
         uiWorkspace,
         shortcuts,

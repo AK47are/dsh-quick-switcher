@@ -67,7 +67,6 @@ export function QuickSwitcherDialog({
   history,
   ask,
   seed,
-  captureDraft,
   generation,
   uiWorkspace,
   shortcuts,
@@ -158,7 +157,7 @@ export function QuickSwitcherDialog({
     panels.getSnapshot,
   );
 
-  // The bridge publishes the current session's prompt window, draft, and
+  // The bridge publishes the current session's input window, draft, and
   // pagination flags. The dialog subscribes so `loadOlder` results and a
   // completed write land without reopening the panel.
   const historySnapshot = React.useSyncExternalStore(
@@ -168,13 +167,8 @@ export function QuickSwitcherDialog({
   );
   // The draft row stands for the text the composer held when the panel
   // opened, not for what it holds after a history entry replaced it. Freezing
-  // it here is what makes that row a restore target. The slash command turns
-  // the capture off because its own token is still the last published draft
-  // at mount, while the input has already removed it.
-  const draftAtOpen = React.useMemo(
-    () => (captureDraft ? history.getSnapshot().draft : ""),
-    [captureDraft],
-  );
+  // it here is what makes that row a restore target.
+  const draftAtOpen = React.useMemo(() => history.getSnapshot().draft, []);
   const historyView = React.useMemo(
     () => ({ ...historySnapshot, draft: draftAtOpen }),
     [historySnapshot, draftAtOpen],

@@ -20,7 +20,6 @@ export const inject = [
   "locale",
   "shortcuts",
   "sessions",
-  "commandUi",
   "uiWorkspace",
   "layout",
 ];
@@ -217,29 +216,9 @@ export function apply(ctx) {
     "quick-switcher: history command",
   );
 
-  // The slash command is the in-conversation entry: it consumes `/history`
-  // without sending a message and opens the same panel in the same mode.
-  ctx.effect(
-    () =>
-      ctx.commandUi.register({
-        name: "history",
-        label: () => t("historyCommandLabel"),
-        description: () => t("historyCommandDescription"),
-        available: () => true,
-        ui: {
-          kind: "action",
-          // The token is consumed synchronously, but the bridge still holds the
-          // pre-consumption draft until the next render, so the panel must not
-          // treat "/history" as the user's draft.
-          run: () => store.requestHistory(false),
-        },
-      }),
-    "quick-switcher: /history",
-  );
-
   // The panel is a root overlay and cannot read a session. This bridge sits in
   // the composer's overlay slot for the displayed session and publishes its
-  // prompt window, draft, and pagination flags to the store the dialog reads.
+  // input window, draft, and pagination flags to the store the dialog reads.
   // It also lends the dialog the two writes it needs: replacing the draft and
   // loading one older page through the session controller.
   ctx.slots.inject("conversation.input.overlay", () => {

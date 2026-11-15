@@ -36,6 +36,20 @@ function userNode(key, seq, text, overrides = {}) {
   };
 }
 
+function questionReplyNode(key, anchorSeq, data) {
+  return {
+    key,
+    kind: "question-reply",
+    anchorSeq,
+    data: {
+      time: anchorSeq * 1000,
+      questions: [],
+      answers: [],
+      ...data,
+    },
+  };
+}
+
 function prompt(seq, text, kind = "user") {
   return { key: `k${seq}`, seq, time: seq * 1000, kind, text };
 }
@@ -98,6 +112,65 @@ test("collectPrompts joins text blocks and tolerates a missing window", () => {
   assert.deepEqual(collectPrompts(undefined, undefined), []);
 });
 
+test("collectPrompts projects one answer row per answered question", () => {
+  const nodes = nodeStore([
+    questionReplyNode("r", 7, {
+      questions: [
+        { id: "q1", header: "确认", question: "继续吗？" },
+        { id: "q2", question: "选哪个？" },
+        { id: "q3", question: "跳过？" },
+      ],
+      answers: [
+        { id: "q1", selected: [], custom: "继续" },
+        { id: "q2", selected: ["甲", "乙"] },
+        { id: "q3", selected: [] },
+      ],
+    }),
+  ]);
+  assert.deepEqual(collectPrompts(["r"], nodes), [
+    {
+      key: "r:q1",
+      seq: 7,
+      time: 7000,
+      kind: "answer",
+      text: "继续",
+      question: "确认 继续吗？",
+    },
+    {
+      key: "r:q2",
+      seq: 7,
+      time: 7000,
+      kind: "answer",
+      text: "甲, 乙",
+      question: "选哪个？",
+    },
+  ]);
+});
+
+test("collectPrompts appends custom answer text after selected labels", () => {
+  const nodes = nodeStore([
+    questionReplyNode("r", 2, {
+      questions: [{ id: "q", question: "哪些？" }],
+      answers: [{ id: "q", selected: ["甲"], custom: " 乙 " }],
+    }),
+  ]);
+  assert.deepEqual(
+    collectPrompts(["r"], nodes).map((entry) => entry.text),
+    ["甲, 乙"],
+  );
+});
+
+test("collectPrompts ignores question-reply nodes without answer text", () => {
+  const nodes = nodeStore([
+    questionReplyNode("r", 1, {
+      questions: [{ id: "q", question: "继续吗？" }],
+      answers: [],
+    }),
+    { key: "bad", kind: "question-reply", anchorSeq: 2, data: null },
+  ]);
+  assert.deepEqual(collectPrompts(["r", "bad"], nodes), []);
+});
+
 test("previewPrompt collapses whitespace and clips the single-line preview", () => {
   assert.equal(previewPrompt("  hello \n world  "), "hello world");
   assert.equal(previewPrompt("   "), "");
@@ -126,6 +199,19 @@ test("historyEntries is newest first and only folds adjacent duplicates", () => 
     [3, 2],
   );
   assert.equal(HISTORY_LIMIT, 200);
+});
+
+test("historyEntries folds adjacent prompts but keeps adjacent answers", () => {
+  const rows = historyEntries([
+    prompt(1, "same"),
+    prompt(2, "same", "answer"),
+    prompt(3, "same", "answer"),
+  ]);
+  assert.deepEqual(rows.map((entry) => entry.seq), [3, 2, 1]);
+  assert.deepEqual(
+    historyEntries([prompt(1, "same"), prompt(2, "same")]).map((entry) => entry.seq),
+    [2],
+  );
 });
 
 test("isInputFrozen covers the three phases that own the draft", () => {
@@ -168,6 +254,27 @@ test("history rows are newest first and mark steering", () => {
   assert.equal(view.rows[0].meta[0].text, "time.justNow");
   assert.equal(view.count, "countHistory:3");
   assert.deepEqual(view.rows[1].run(), { type: "history", text: "new" });
+});
+
+test("answer rows carry the answer badge and match on the question", () => {
+  const prompts = [
+    prompt(1, "old"),
+    {
+      key: "r:q1",
+      seq: 2,
+      time: 2000,
+      kind: "answer",
+      text: "继续",
+      question: "确认继续吗",
+    },
+  ];
+  const view = viewOf(historyState({ prompts }));
+  const row = view.rows.find((entry) => entry.key === "h:p:r:q1");
+  assert.equal(row.badge, "historyAnswerBadge");
+  assert.deepEqual(row.run(), { type: "history", text: "继续" });
+
+  const filtered = viewOf(historyState({ prompts }), "!确认");
+  assert.deepEqual(filtered.rows.map((entry) => entry.title), ["继续"]);
 });
 
 test("a non-empty draft leads and hides the newest prompt it duplicates", () => {
@@ -296,7 +403,6 @@ test("the open store seeds history and toggles from the active route", () => {
     open: false,
     seed: "",
     prefix: "",
-    captureDraft: true,
     generation: 0,
   });
 
@@ -316,13 +422,7 @@ test("the open store seeds history and toggles from the active route", () => {
   store.requestHistory();
   assert.equal(store.getSnapshot().open, true);
   assert.equal(store.getSnapshot().seed, "!");
-  assert.equal(store.getSnapshot().captureDraft, true);
   assert.equal(store.getSnapshot().generation, 4);
-
-  store.close();
-  store.requestHistory(false);
-  assert.equal(store.getSnapshot().open, true);
-  assert.equal(store.getSnapshot().captureDraft, false);
 });
 
 test("the open store trusts the reported prefix over the seed", () => {

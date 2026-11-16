@@ -136,7 +136,7 @@ const STYLE = `
   color: var(--dsw-alias-label-tertiary);
 }
 .dqs-settings-warning {
-  color: var(--dsw-alias-state-warning-primary, var(--dsw-alias-label-secondary));
+  color: var(--dsw-alias-state-warn-primary, var(--dsw-alias-label-secondary));
 }
 .dqs-settings-tag {
   flex: none;

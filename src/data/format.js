@@ -65,9 +65,12 @@ export function formatUsage(usage, t) {
 /**
  * Relative time, or the sidebar's compact pending label while waiting.
  *
- * The switcher sorts empty-query rows by `recentAt` (last time the session
- * was shown, falling back to `updatedAt`), so the label shows that same value
- * and the visible time always explains the order above it.
+ * Every group but the pending one sorts by `recentAt` (last time the session
+ * was shown, falling back to `updatedAt`), so its visible time explains the
+ * order above it. The pending group sorts by what the user has already opened
+ * instead, and its rows show the status label in the time slot, so the text
+ * there names the reason the row waits rather than a recency that does not
+ * order the group.
  */
 export function rowTimeLabel(entry, t, now) {
   if (entry.status.compactKey !== null) return t(entry.status.compactKey);

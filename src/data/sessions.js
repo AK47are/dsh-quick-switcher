@@ -2,6 +2,10 @@
 
 import { cleanTitle, toMillis } from "./format.js";
 import { idKeyOf, shortIdOf } from "./ids.js";
+import {
+  PENDING_ORDER_LEAST_RECENT,
+  pendingOrderOf,
+} from "./pending-order.js";
 
 /**
  * Pending interactions that the sidebar projects as a warning dot.
@@ -150,6 +154,32 @@ function stateRank(status) {
   return STATE_RANK[status?.state] ?? STATE_RANK.idle;
 }
 
+/** Stable tie-break for two rows whose sort keys agree. */
+function compareIds(left, right) {
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+}
+
+/**
+ * Order one pending group under the default preference.
+ *
+ * The pending group is the one list whose order decides what to act on next, so
+ * it leads with the rows the user has not opened yet instead of the newest
+ * visit. Rows the plugin never showed come first, ordered by their session
+ * activity; the opened rows queue behind them by their oldest visit. Both keys
+ * ascend, so recording a visit can only move a row down, and a session that
+ * turns out to be unactionable never pushes the rows the user has not checked
+ * yet away.
+ */
+function comparePendingByLeastRecentVisit(left, right) {
+  const leftSeen = left.lastAccessAt > 0;
+  const rightSeen = right.lastAccessAt > 0;
+  if (leftSeen !== rightSeen) return leftSeen ? 1 : -1;
+  const leftKey = leftSeen ? left.lastAccessAt : left.updatedAt;
+  const rightKey = rightSeen ? right.lastAccessAt : right.updatedAt;
+  if (leftKey !== rightKey) return leftKey - rightKey;
+  return compareIds(left, right);
+}
+
 /**
  * Build the searchable session rows.
  *
@@ -174,6 +204,13 @@ function stateRank(status) {
  * route's relevance order instead; this list is the base for both, so its
  * order is the only tie the routes inherit.
  *
+ * The pending group is the exception. Under the default preference it ignores
+ * `recentAt`: rows the plugin never showed lead by `updatedAt`, and the opened
+ * rows follow by `lastAccessAt`, both ascending, so a visit only moves a row
+ * down. The user's setting can flip the group back to the list-wide rule. The
+ * pinned row still leads the whole list, so the previous session stays
+ * reachable even while it waits on the user.
+ *
  * A row also carries the canonical id key and the short code derived from it.
  * The row renders the short code and the search compares the full key, so both
  * read the same normalization and a code on screen always stays searchable.
@@ -184,7 +221,9 @@ export function collectSessionEntries(
   statuses,
   isPanelActive,
   accessTimes,
+  pendingOrder = PENDING_ORDER_LEAST_RECENT,
 ) {
+  const order = pendingOrderOf(pendingOrder);
   const archived = new Set(
     Array.isArray(workspaceList?.archivedSessionIds)
       ? workspaceList.archivedSessionIds
@@ -262,8 +301,11 @@ export function collectSessionEntries(
     if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
     const rank = stateRank(left.status) - stateRank(right.status);
     if (rank !== 0) return rank;
+    if (left.status.state === "warning" && order === PENDING_ORDER_LEAST_RECENT) {
+      return comparePendingByLeastRecentVisit(left, right);
+    }
     if (left.recentAt !== right.recentAt) return right.recentAt - left.recentAt;
-    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+    return compareIds(left, right);
   });
   return { entries, currentId };
 }

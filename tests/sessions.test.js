@@ -252,3 +252,123 @@ test("an id too short to search shows no short code", () => {
   assert.equal(entries[0].idKey, "ab");
   assert.equal(entries[0].shortId, "");
 });
+
+/**
+ * A list with a current row and a pinned previous row, so the pending rows stay
+ * inside their own group instead of becoming the pinned one.
+ */
+function pendingList() {
+  return listOf([
+    session({ id: "now", title: "Current", updatedAt: 10, retainedBy: { mainView: 1 } }),
+    session({ id: "prev", title: "Previous", updatedAt: 20 }),
+    session({ id: "a", title: "Waited three days", updatedAt: 300 }),
+    session({ id: "b", title: "Waited ten minutes", updatedAt: 1000 }),
+    session({ id: "c", title: "Opened just now", updatedAt: 200 }),
+  ]);
+}
+
+const allPending = new Map([
+  ["a", { pendingInteraction: { kind: "approval" } }],
+  ["b", { pendingInteraction: { kind: "question" } }],
+  ["c", { pendingInteraction: { kind: "plan-review" } }],
+]);
+
+test("the default pending order leads with unopened rows", () => {
+  const access = new Map([
+    ["now", 9000],
+    ["prev", 8000],
+    ["c", 2000],
+  ]);
+  const { entries } = collectSessionEntries(pendingList(), emptyWorkspaces, allPending, false, access);
+  assert.deepEqual(
+    entries.map((entry) => entry.id),
+    ["prev", "a", "b", "c", "now"],
+  );
+});
+
+test("a visit moves a pending row to the end of its group", () => {
+  const before = new Map([
+    ["now", 9000],
+    ["prev", 8000],
+    ["a", 100],
+    ["b", 1000],
+    ["c", 2000],
+  ]);
+  const first = collectSessionEntries(pendingList(), emptyWorkspaces, allPending, false, before);
+  assert.deepEqual(
+    first.entries.map((entry) => entry.id),
+    ["prev", "a", "b", "c", "now"],
+  );
+
+  const after = new Map(before).set("a", 3000);
+  const second = collectSessionEntries(pendingList(), emptyWorkspaces, allPending, false, after);
+  assert.deepEqual(
+    second.entries.map((entry) => entry.id),
+    ["prev", "b", "c", "a", "now"],
+  );
+});
+
+test("the most recent preference restores the list-wide rule", () => {
+  const access = new Map([
+    ["now", 9000],
+    ["prev", 8000],
+    ["c", 2000],
+  ]);
+  const { entries } = collectSessionEntries(
+    pendingList(),
+    emptyWorkspaces,
+    allPending,
+    false,
+    access,
+    "most-recent",
+  );
+  assert.deepEqual(
+    entries.map((entry) => entry.id),
+    ["prev", "c", "b", "a", "now"],
+  );
+});
+
+test("the pending order leaves the other groups on recent time", () => {
+  const list = listOf([
+    session({ id: "now", title: "Current", updatedAt: 10, retainedBy: { mainView: 1 } }),
+    session({ id: "prev", title: "Previous", updatedAt: 20 }),
+    session({ id: "old-idle", title: "Old idle", updatedAt: 100 }),
+    session({ id: "new-idle", title: "New idle", updatedAt: 900 }),
+    session({ id: "waiting", title: "Waiting", updatedAt: 500 }),
+  ]);
+  const statuses = new Map([["waiting", { pendingInteraction: { kind: "approval" } }]]);
+  const access = new Map([
+    ["prev", 8000],
+    ["old-idle", 1000],
+    ["new-idle", 100],
+  ]);
+  const { entries } = collectSessionEntries(list, emptyWorkspaces, statuses, false, access);
+  assert.deepEqual(
+    entries.map((entry) => entry.id),
+    ["prev", "waiting", "old-idle", "new-idle", "now"],
+  );
+});
+
+test("a pinned pending row still leads the list", () => {
+  const list = listOf([
+    session({ id: "open", title: "Current", updatedAt: 900, retainedBy: { mainView: 1 } }),
+    session({ id: "prev", title: "Previous", updatedAt: 100 }),
+    session({ id: "other", title: "Other", updatedAt: 500 }),
+  ]);
+  const statuses = new Map([
+    ["prev", { pendingInteraction: { kind: "approval" } }],
+    ["other", { pendingInteraction: { kind: "question" } }],
+  ]);
+  const access = new Map([
+    ["open", 900],
+    ["prev", 800],
+    ["other", 700],
+  ]);
+  const { entries } = collectSessionEntries(list, emptyWorkspaces, statuses, false, access);
+  assert.deepEqual(
+    entries.map((entry) => entry.id),
+    ["prev", "other", "open"],
+  );
+  assert.equal(entries[0].pinned, true);
+  assert.equal(entries[0].current, false);
+});

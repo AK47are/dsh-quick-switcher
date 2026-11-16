@@ -1,24 +1,34 @@
 /**
- * Per-browser preferences for the side question. The settings page owns the
- * switch; the ask store reads the published snapshot when a question is sent,
- * so a change applies to the next question without rebuilding the panel.
+ * Per-browser preferences for the switcher. The settings page owns the
+ * controls; the ask store reads the published snapshot when a question is sent
+ * and the panel reads it when it opens, so a change applies without rebuilding
+ * the open overlay.
  */
 
+import { pendingOrderOf } from "./data/pending-order.js";
+
 const STORAGE_KEY = "dsh.quick-switcher.v1";
-const DEFAULTS = Object.freeze({ includeAttachments: true });
+const DEFAULTS = Object.freeze({
+  includeAttachments: true,
+  pendingOrder: pendingOrderOf(undefined),
+});
 
 /**
  * Read the persisted snapshot. A malformed or unavailable document falls back
- * to the defaults instead of disabling attachments.
+ * to the defaults; a field an older version wrote without falls back on its own,
+ * so adding a preference never resets the others.
  * @param {Storage | undefined} storage
- * @returns {{ includeAttachments: boolean }}
+ * @returns {{ includeAttachments: boolean, pendingOrder: string }}
  */
 export function readPreferences(storage) {
   try {
     const raw = storage?.getItem(STORAGE_KEY);
     if (raw === null || raw === undefined) return DEFAULTS;
     const parsed = JSON.parse(raw);
-    return { includeAttachments: parsed?.includeAttachments !== false };
+    return {
+      includeAttachments: parsed?.includeAttachments !== false,
+      pendingOrder: pendingOrderOf(parsed?.pendingOrder),
+    };
   } catch {
     return DEFAULTS;
   }
@@ -54,18 +64,29 @@ export class PreferencesStore {
 
   /** Persist and publish the attachment preference. */
   setIncludeAttachments(value) {
-    this.#snapshot = { includeAttachments: value === true };
+    this.#write({ includeAttachments: value === true });
+  }
+
+  /** Persist and publish the pending group's order. */
+  setPendingOrder(value) {
+    this.#write({ pendingOrder: pendingOrderOf(value) });
+  }
+
+  dispose() {
+    this.#eventTarget?.removeEventListener?.("storage", this.#onStorage);
+    this.#listeners.clear();
+  }
+
+  #write(patch) {
+    // Merge instead of replacing: each setter owns one field, and rebuilding
+    // the snapshot here would silently drop the preference it does not touch.
+    this.#snapshot = { ...this.#snapshot, ...patch };
     try {
       this.#storage?.setItem(STORAGE_KEY, JSON.stringify(this.#snapshot));
     } catch {
       // A blocked or full localStorage still lets the choice apply this session.
     }
     this.#emit();
-  }
-
-  dispose() {
-    this.#eventTarget?.removeEventListener?.("storage", this.#onStorage);
-    this.#listeners.clear();
   }
 
   #emit() {

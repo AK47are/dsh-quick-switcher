@@ -20,17 +20,43 @@ function memoryStorage(initial = {}) {
   };
 }
 
-test("attachments are on by default and malformed storage falls back", () => {
-  assert.deepEqual(readPreferences(undefined), { includeAttachments: true });
-  assert.deepEqual(readPreferences(memoryStorage()), { includeAttachments: true });
+test("both preferences default and malformed storage falls back", () => {
+  const defaults = { includeAttachments: true, pendingOrder: "least-recent" };
+  assert.deepEqual(readPreferences(undefined), defaults);
+  assert.deepEqual(readPreferences(memoryStorage()), defaults);
   assert.deepEqual(
     readPreferences(memoryStorage({ [STORAGE_KEY]: "not json" })),
-    { includeAttachments: true },
+    defaults,
   );
   assert.deepEqual(
     readPreferences(memoryStorage({ [STORAGE_KEY]: JSON.stringify({ includeAttachments: false }) })),
-    { includeAttachments: false },
+    { includeAttachments: false, pendingOrder: "least-recent" },
   );
+});
+
+test("an unknown pending order falls back to the default", () => {
+  const stored = memoryStorage({
+    [STORAGE_KEY]: JSON.stringify({ pendingOrder: "sideways" }),
+  });
+  assert.equal(readPreferences(stored).pendingOrder, DEFAULTS.pendingOrder);
+});
+
+test("each setter keeps the preference it does not own", () => {
+  const storage = memoryStorage();
+  const store = new PreferencesStore({ storage, eventTarget: new EventTarget() });
+
+  store.setPendingOrder("most-recent");
+  store.setIncludeAttachments(false);
+  assert.deepEqual(readPreferences(storage), {
+    includeAttachments: false,
+    pendingOrder: "most-recent",
+  });
+
+  store.setPendingOrder("least-recent");
+  assert.deepEqual(readPreferences(storage), {
+    includeAttachments: false,
+    pendingOrder: "least-recent",
+  });
 });
 
 test("the store persists and publishes a preference change", () => {
@@ -42,29 +68,41 @@ test("the store persists and publishes a preference change", () => {
   });
 
   assert.equal(store.getSnapshot().includeAttachments, DEFAULTS.includeAttachments);
-  store.setIncludeAttachments(false);
+  store.setPendingOrder("most-recent");
 
-  assert.equal(store.getSnapshot().includeAttachments, false);
-  assert.deepEqual(readPreferences(storage), { includeAttachments: false });
+  assert.equal(store.getSnapshot().pendingOrder, "most-recent");
+  assert.deepEqual(readPreferences(storage), {
+    includeAttachments: true,
+    pendingOrder: "most-recent",
+  });
   assert.equal(notifications, 1);
 
   unsubscribe();
-  store.setIncludeAttachments(true);
+  store.setIncludeAttachments(false);
   assert.equal(notifications, 1);
-  assert.deepEqual(readPreferences(storage), { includeAttachments: true });
+  assert.deepEqual(readPreferences(storage), {
+    includeAttachments: false,
+    pendingOrder: "most-recent",
+  });
 });
 
-test("a storage event from another tab reloads the snapshot", () => {
+test("a storage event from another tab reloads the whole snapshot", () => {
   const storage = memoryStorage();
   const target = new EventTarget();
   const store = new PreferencesStore({ storage, eventTarget: target });
 
-  storage.setItem(STORAGE_KEY, JSON.stringify({ includeAttachments: false }));
+  storage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ includeAttachments: false, pendingOrder: "most-recent" }),
+  );
   const event = new Event("storage");
   event.key = STORAGE_KEY;
   target.dispatchEvent(event);
 
-  assert.equal(store.getSnapshot().includeAttachments, false);
+  assert.deepEqual(store.getSnapshot(), {
+    includeAttachments: false,
+    pendingOrder: "most-recent",
+  });
 });
 
 test("dispose stops following storage events", () => {
@@ -73,10 +111,13 @@ test("dispose stops following storage events", () => {
   const store = new PreferencesStore({ storage, eventTarget: target });
   store.dispose();
 
-  storage.setItem(STORAGE_KEY, JSON.stringify({ includeAttachments: false }));
+  storage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ includeAttachments: false, pendingOrder: "most-recent" }),
+  );
   const event = new Event("storage");
   event.key = STORAGE_KEY;
   target.dispatchEvent(event);
 
-  assert.equal(store.getSnapshot().includeAttachments, true);
+  assert.deepEqual(store.getSnapshot(), DEFAULTS);
 });

@@ -11,6 +11,7 @@ import {
 import { collectSessionEntries } from "../data/sessions.js";
 import { collectWorkspaceRows } from "../data/workspaces.js";
 import { createPointerGate, getPointerBaseline } from "../pointer.js";
+import { preferences } from "../preferences.js";
 import { createRoutes, pickView } from "../routes/index.js";
 import { AskDetail, AskFooter } from "./ask-detail.js";
 import { detailKeyAction } from "./ask-keys.js";
@@ -106,9 +107,11 @@ export function QuickSwitcherDialog({
     [],
   );
 
-  // The access map is read once per panel mount: the modal blocks navigation,
-  // so no visit can be recorded while it is open.
+  // The access map and the pending order are read once per panel mount: the
+  // modal blocks navigation and the settings page, so neither can change while
+  // it is open.
   const accessTimes = React.useMemo(() => getAccessStore().getSnapshot(), []);
+  const pendingOrder = React.useMemo(() => preferences.getSnapshot().pendingOrder, []);
   const sessionData = React.useMemo(
     () =>
       collectSessionEntries(
@@ -117,8 +120,9 @@ export function QuickSwitcherDialog({
         statuses,
         isPanelActive,
         accessTimes,
+        pendingOrder,
       ),
-    [sessionList, workspaceList, statuses, isPanelActive, accessTimes],
+    [sessionList, workspaceList, statuses, isPanelActive, accessTimes, pendingOrder],
   );
   const { entries, currentId } = sessionData;
   // The pending card a side question would be about. It is read from the same

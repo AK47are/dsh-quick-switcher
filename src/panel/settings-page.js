@@ -1,9 +1,19 @@
-/* Settings section for the side question's attachment preference. */
+/* Settings section for the switcher's browser preferences. */
 
 import React from "react";
+import {
+  PENDING_ORDER_LEAST_RECENT,
+  PENDING_ORDER_MOST_RECENT,
+} from "../data/pending-order.js";
 import { preferences } from "../preferences.js";
 
 const h = React.createElement;
+
+/** The pending group's two orders, in the order the row lists them. */
+const PENDING_ORDER_CHOICES = [
+  { value: PENDING_ORDER_LEAST_RECENT, labelKey: "settingsPendingOrderLeastRecent" },
+  { value: PENDING_ORDER_MOST_RECENT, labelKey: "settingsPendingOrderMostRecent" },
+];
 
 const STYLE = `
 .dqs-settings-page {
@@ -95,6 +105,26 @@ const STYLE = `
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
+.dqs-settings-choices {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+}
+.dqs-settings-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.dqs-settings-choice input {
+  flex: none;
+  margin: 0;
+  accent-color: var(--dsw-alias-state-business-primary);
+}
 @media (prefers-reduced-motion: reduce) {
   .dqs-settings-switch,
   .dqs-settings-switch::after {
@@ -104,12 +134,14 @@ const STYLE = `
 `;
 
 /**
- * Settings page for the side question. The shell owns the panel chrome and
- * navigation; this component renders the one preference this plugin owns.
+ * One row per preference. The shell owns the panel chrome and navigation; the
+ * rows below explain their own behavior because the panel list has no room for
+ * that copy and the rule only matters while choosing an option.
  */
 export function SettingsSection({ t, preferences: store = preferences }) {
   const state = React.useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const included = state.includeAttachments;
+  const pendingOrder = state.pendingOrder;
   return h(
     "div",
     { className: "dqs-settings-page" },
@@ -119,6 +151,39 @@ export function SettingsSection({ t, preferences: store = preferences }) {
       { className: "dqs-settings-heading" },
       h("h2", { className: "dqs-settings-title" }, t("settingsTitle")),
       h("p", { className: "dqs-settings-description" }, t("settingsDescription")),
+    ),
+    h(
+      "div",
+      { className: "dqs-settings-row" },
+      h(
+        "div",
+        { className: "dqs-settings-text" },
+        h("div", { className: "dqs-settings-rowTitle" }, t("settingsPendingOrderTitle")),
+        h("p", { className: "dqs-settings-rowDescription" }, t("settingsPendingOrderDescription")),
+        h("p", { className: "dqs-settings-rowHint" }, t("settingsPendingOrderHint")),
+      ),
+      h(
+        "div",
+        {
+          className: "dqs-settings-choices",
+          role: "radiogroup",
+          "aria-label": t("settingsPendingOrderTitle"),
+        },
+        PENDING_ORDER_CHOICES.map((choice) =>
+          h(
+            "label",
+            { key: choice.value, className: "dqs-settings-choice" },
+            h("input", {
+              type: "radio",
+              name: "dqs-pending-order",
+              value: choice.value,
+              checked: pendingOrder === choice.value,
+              onChange: () => store.setPendingOrder(choice.value),
+            }),
+            t(choice.labelKey),
+          ),
+        ),
+      ),
     ),
     h(
       "div",

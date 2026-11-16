@@ -3,8 +3,9 @@
 
 import commands from "./commands/client.js";
 import files from "./files/client.js";
+import history from "./history/client.js";
 import panels from "./panels/client.js";
 import sessions from "./sessions/client.js";
 import workspaces from "./workspaces/client.js";
 
-export const clientModules = [sessions, workspaces, commands, panels, files];
+export const clientModules = [sessions, workspaces, commands, panels, files, history];

@@ -1,6 +1,6 @@
 /* Main-panel module: the "#" list of full-page surfaces. */
 
-import { defineModule } from "../../core/module.js";
+import { defineModule, prefixMatcher } from "../../core/module.js";
 import { filterEntries } from "../../core/lib/search.js";
 import { locale } from "./locale.js";
 import { PANEL_SLOT, collectPanelEntries, createPanelStore } from "./logic.js";
@@ -110,16 +110,7 @@ export default defineModule("panels", (api) => {
     mount(panel) {
       const unsubscribe = store.subscribe(() => panel.notify());
       return {
-        matchers: [
-          {
-            id: "panels",
-            priority: 10,
-            match(query) {
-              return query.startsWith("#") ? { filter: query.slice(1) } : null;
-            },
-            view,
-          },
-        ],
+        matchers: [prefixMatcher("#", { id: "panels", priority: 10, view })],
         dispose: unsubscribe,
       };
     },

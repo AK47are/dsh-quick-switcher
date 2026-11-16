@@ -1,4 +1,4 @@
-快速切换器是 DSH Web 的统一搜索入口。它用一个输入框切换会话，也可以进入某个工作区查看它的会话、直接在那个工作区新建会话，搜索并运行 DSH 的应用命令，把当前会话已发送的提示词与回答填回输入框，跳到插件、自动化任务这类主面板，搜索当前工作区的文件并交给右侧栏预览，或者就当前会话问一个不进入主对话的侧问。侧问携带模型可见的完整消息、工具轨迹与运行中的现场，图片与文件可在设置里关闭。
+快速切换器是 DSH Web 的统一搜索入口。它用一个输入框切换会话，也可以进入某个工作区查看它的会话、直接在那个工作区新建会话，搜索并运行 DSH 的应用命令，把当前会话已发送的提示词与回答填回输入框，跳到插件、自动化任务这类主面板，搜索当前工作区的文件并交给右侧栏预览，或者就当前会话问一个不进入主对话的侧问。七种列表各是一个模块，其他客户端插件也可以通过公开的 quickSwitcher 服务注册自己的模式，见「公开服务」。侧问携带模型可见的完整消息、工具轨迹与运行中的现场，图片与文件可在设置里关闭。
 
 ## 当前范围
 
@@ -58,7 +58,7 @@ DSH 的会话列表按工作区分组，工作区一多就很难只用鼠标定�
 - 详情底栏复用面板的键帽提示：动作靠左、Esc 关闭靠右，键帽与列表底栏同一套样式与字体，按钮本身不画边框
 - 记录可以复制、重新生成与分叉；重新生成清空答案并用原问题与背景重发，宿主重新读取当前历史与现场；分叉以发问时刻的会话序号为准
 - 快照超过模型窗口时宿主返回 413 并说明超窗，不静默丢历史或截断现场；附件不参与字符预算
-- 设置页的「快速切换器」分区有两个偏好，都存在浏览器本地：「侧问携带图片与文件」默认开启，关掉后图片与文件只保留占位，重新生成沿用发问时的开关值；「待处理会话排序」默认「最久未访问优先」，可切成「最近访问优先」，只影响待处理组
+- 设置页按模块分组，目前有「会话」的「待处理会话排序」与「侧问」的「侧问携带图片与文件」两个偏好，都存在浏览器本地：附件开关默认开启，关掉后图片与文件只保留占位，重新生成沿用发问时的开关值；排序默认「最久未访问优先」，可切成「最近访问优先」，只影响待处理组
 - 子代理的内部活动不进入侧问；developer 消息（工具目录变化）跳过，它们与侧问无关
 - 只有标题命中才给文字高亮，路径、别名、会话 ID 或题面命中不产生高亮；会话、工作区与命令最多 50 条，历史最多 200 条
 - 已归档、空白草稿或子智能体会话不会出现，它们不属于可切换的用户会话
@@ -111,33 +111,78 @@ npm install
 npm run build
 ```
 
-npm run check 校验 client.js 与 src/ 是否一致，产物缺失时报缺失、落后时报落后；npm test 跑搜索、会话 ID、命令、会话状态、工作区、主面板、输入历史、文件路由、侧问、侧问快照与现场块、浏览器偏好、待处理排序、详情按键、数字直达与会话行的单元测试。
+npm run check 校验 client.js 与 src/ 是否一致，产物缺失时报缺失、落后时报落后；npm test 跑模块接口与注册中心、设置存储、文案合并、匹配器与视图、五个行类模块、输入历史、侧问、宿主路由、搜索、时间、会话 ID、指针、数字直达与面板按键的单元测试。module.js 是公开的模块声明入口，单独发布，不打包进 client.js。
 
 本目录以 link: 方式装进 profile 时，pnpm 只建符号链接，不跑依赖的生命周期脚本，prepare 因此不会触发。这种情况下装完依赖再手动跑一次 npm run build，否则 DSH 的客户端加载器会因为缺产物直接启动失败。
 
 ## 扩展
 
-七种列表按路由拆分。新增一种列表时，在 src/routes/ 下写一个路由对象，再到 src/routes/index.js 注册，面板本身不需要改：
+七种列表现在都是模块，位于 src/modules 下。新增一种列表、命令、设置或宿主端点时，在 src/modules 建一个目录，声明一个模块，再把定义加进 src/modules/client-manifest.js；面板外壳、其他模块与本体都不需要改。
 
-- prefix 决定认领哪些输入，最长前缀优先，会话路由的空前缀兜底
-- parse 把输入变成路由自己的状态
-- view 返回占位符、列表标签、统一的行、空状态、底部提示与计数
-- view 可以返回 load，面板渲染后调用它发起异步查询；结果回来时调用注册路由时拿到的 notify 让面板重渲染，同步路由不需要这一项
-- 行的 run 返回 close、query、command、history 或 file 效果，面板负责关闭面板、恢复焦点、切换查询、运行命令、写入输入框或在右侧栏打开文件
-- 路由也可以返回 content 与 footer 描述符，让面板改渲染一个组件而不是行列表；此时 inputLocked 把输入框变成只读，back 负责回到列表
-- 直达提示由面板外壳按当前可见顺序生成，路由不需要声明；用 content 渲染的只读视图没有行，也没有直达提示
+模块声明在加载时执行一次，收到一份静态能力包（`t`、`settings`、`panel`、`shared`、`services`、`get`、`effect`、`log`），返回这些贡献：
 
-工作区的「+标题 」作用域词与同名工作区记忆都在 src/routes/workspaces.js 里，属于路由自己的状态。
+- matchers：输入认领与视图；每个匹配器有 id、priority、match 与 view，前缀用 prefixMatcher 生成，后缀或正则触发放进 match 即可
+- mount：每次打开面板创建一次，返回 providers、matchers 与 dispose；挂载面上的额外字段会作为 instance 交给该模块的 Provider 与内容渲染器
+- settings：按 `[模块, 分组?, 字段]` 声明的字段，设置页自动出现
+- locale：模块自己的中英字典
+- commands：注册到 DSH 快捷键表的命令
+- slots：注册任意 DSH 槽，例如会话输入框的桥接
+- views：按 kind 注册内容与底栏渲染器
 
-命令行由 src/routes/commands.js 认领 > 前缀；src/data/commands.js 把快捷键 catalog 投影成条目并实现执行判定，src/data/recent.js 维护最近命令列表。命令本身仍由 DSH 注册和解析，插件不复制命令定义。
+宿主半区另有一份 src/modules/host-manifest.js，宿主模块用 routes 与 listeners 交上 webServer 路由与事件订阅。
 
-文件模式由 src/routes/files.js 认领 @ 前缀；src/data/files.js 负责路径拆分与文件地址。路由不持有 DSH 服务，搜索与打开都走面板传入的 files 能力，由 src/plugin.js 按名字从共享服务表取 remote.fileReferences 与 sidebarRight；src/panel/rightbar.js 只负责打开后把焦点交给右侧栏。
+模块只能 import src/core 与自己的文件，不能 import 别的模块。需要别的模块拥有的数据时用 `api.shared.store(name)`：会话模块发布 session-data，工作区模块读取同一份条目。
 
-主面板行由 src/routes/panels.js 认领 # 前缀；src/data/panels.js 读 `sidebar.panellist` 的注册项、解析三种标签形态并维护可订阅快照，src/plugin.js 负责在注册变化与语言切换时刷新它。
+一个最小匹配器如下：
 
-历史行由 src/routes/history.js 认领 ! 前缀；src/data/history.js 从聊天节点提取提示词与问答回复、折叠相邻提示词重复、把题面放进次要搜索字段并生成单行预览。面板挂在根级 overlay，拿不到会话钩子，所以 src/panel/history-bridge.js 在会话输入框的 overlay 槽里订阅 useChat、useInput、useSession 与 inputActions，把提示词、回答、草稿、发送阶段与分页状态发布到 src/history-store.js，面板只读这个 store。
+```js
+import { defineModule } from "../../core/module.js";
 
-侧问由 src/routes/ask.js 认领 ? 前缀，路由只产出数据：列表页返回发问行与历史行，详情页返回 content 与 footer 描述符。src/ask-store.js 持有记录、流式折叠、中止与分叉，并把发问时的附件偏好写进请求；src/ask-context.js 从待处理卡片摘取只读背景，src/ask-markdown.js 渲染答案，src/panel/ask-detail.js 是详情与操作栏，src/panel/ask-keys.js 把详情里的字母键映射成动作。宿主半区在 index.js：订阅 agent/assistant-stream 累积当前步骤的现场，把模型可见消息里的 reasoning、tool-call 与 tool-result 投影成文本，/dsh-quick-switcher/ask 流式返回答案，/dsh-quick-switcher/fork 在发问时刻分叉并写入一条用户消息。src/preferences.js 存浏览器偏好，src/panel/settings-page.js 是设置页分区；待处理组的两种顺序定义在 src/data/pending-order.js，比较器在 src/data/sessions.js。
+export default defineModule("my-mode", (api) => ({
+  apiVersion: 1,
+  order: 80,
+  locale: { zh: { title: "我的模式" }, en: { title: "My mode" } },
+  mount(panel) {
+    return {
+      matchers: [
+        {
+          id: "my-mode",
+          priority: 10,
+          match: (query) => (query.startsWith(":") ? { filter: query.slice(1) } : null),
+          view: (state, panel) => ({
+            placeholder: "搜索",
+            rows: [],
+            emptyText: "没有匹配",
+            hints: [{ keys: ["Esc"], label: api.t("hintClose") }],
+            count: "",
+          }),
+        },
+      ],
+      dispose() {},
+    };
+  },
+}));
+```
+
+## 公开服务
+
+其他客户端插件也可以注册模块，不需要改本插件。声明 `inject: ["quickSwitcher"]`，在 apply 里注册一个由 defineModule 生成的模块定义：
+
+```js
+import { defineModule } from "dsh-quick-switcher/module";
+
+export const inject = ["quickSwitcher"];
+
+export function apply(ctx) {
+  ctx.effect(() =>
+    ctx.quickSwitcher.register(
+      defineModule("my-mode", (api) => ({ /* 与上面的模块声明相同 */ })),
+    ),
+  );
+}
+```
+
+服务提供 apiVersion（当前为 1）、register 与 panel 的 open/close/toggle/isOpen/getState/subscribe/list。register 返回注销函数；面板打开期间注册或注销只增删受影响模块的挂载面，保留查询、选中与其他模块的运行中状态。宿主端点不对外开放。
 
 ## 安装
 
@@ -148,33 +193,24 @@ npm run check 校验 client.js 与 src/ 是否一致，产物缺失时报缺失�
 ## 限制
 
 - 当前只支持 DSH Web，不支持纯 TUI
-- 依赖 DSH 的 Slot 根钩子（`useSessionStatus`、`useSessions`、`useWorkspaces`、`usePanelInfo`）和官方 `StateDot` 组件；DSH 升级后如果这些接口改名，需要回归
-- 主面板列表依赖 `ctx.slots.entriesOfSlot("sidebar.panellist")`，打开依赖 `ctx.layout.selectPanel(id)`；两款接口都是客户端插件的公开面，但 DSH 升级后仍需回归
-- 主面板标签的三种形态（字符串、函数、语言映射）由插件自己解析，DSH 若改变标签约定需要跟进
-- 部署没有注册任何主面板时，# 列表显示「没有可用的主面板」，不会退回会话列表
-- 命令列表读 `ctx.shortcuts` 的 catalog 与 config，执行时还要读 `registry` 里的命令对象并调用它的 `resolve`；后者不是 DSH 的公开 API，升级后需要回归
+- 依赖 DSH 客户端公开的 Slot 钩子与组件：`useSessionStatus`、`useSessions`、`useWorkspaces`、`usePanelInfo`、`useChat`、`useInput`、`useSession` 与官方 `StateDot`；DSH 升级改名时需要回归
+- 主面板列表依赖 `ctx.slots.entriesOfSlot("sidebar.panellist")` 与 `ctx.layout.selectPanel(id)`；面板标签的字符串、函数、语言映射三种形态由插件解析
+- 文件搜索依赖 `ctx.get("remote.fileReferences")`，文件打开与预览依赖 `ctx.get("sidebarRight").openResource` 与 `dsh-resource://file/session/...` 地址；缺失时只有文件模式报错
+- 命令列表读 `ctx.shortcuts` 的 catalog 与 config，执行时读 registry 里的命令对象并调用 resolve；后者不是 DSH 的公开 API
+- 输入历史依赖 `conversation.input.overlay` 的标准属性与 `sessions.binding(id).session.loadOlder()`；问答回复依赖 `question-reply` 节点与 `questions`/`answers` 形状
+- 新建会话依赖 `uiWorkspace.startSession`，DSH 0.2.2 之前没有这个方法
+- 侧问依赖宿主半区的 `webServer`、`agents`、`llm` 与 `sessionController`；流事件与宿主路由是插件自己的协议，宿主与客户端必须同版本
+- 侧问背景依赖审批卡、提问卡与计划审阅卡的 DOM 选择器；DSH 改选择器时背景会变空，问题仍能发出
+- 侧问是模态的：面板打开时审批卡与提问卡不可点；关闭面板会中止正在生成的答案，已收到的部分保留
+- 侧问记录只在内存，刷新即丢；分叉要求构建提供 `sessionController.fork`，否则宿主返回 501
+- 文件结果上限、忽略目录与索引上限由 DSH 的 fileReferences 配置决定；目录只能靠 Enter 补全钻取，面板里的 Tab 仍是焦点切换
+- 已归档、空白草稿或子智能体会话不出现；会话 ID 只认规范化后至少 4 位的前缀，短码只显示规范化后至少 4 位的 id
+- 访问时间从安装插件后开始记录；清掉站点数据后退回更新时间，没有访问历史时无法判断上个会话
+- 设置只存在浏览器本地，换浏览器或清站点数据后回到默认值；需要宿主读取的值只能随请求传过去
+- 模块之间不能互相 import；共享数据走命名 store，名字写错只会读出 null
+- 公开服务只覆盖客户端，apiVersion 为 1；宿主端点与宿主注册中心不对外开放
+- 模块设置支持 boolean、choice、number 与 custom 四种字段；自定义控件需要模块自己提供 render
+- 主面板没有注册项时 # 列表显示「没有可用的主面板」，不会退回会话列表
 - 命令列表不显示 fixed 只读动作，也不能为它们改键
 - 输入历史只覆盖会话已加载的消息窗口，更早的输入要点「加载更早的输入」逐页拉，一次补 50 到 500 条消息
-- 输入历史依赖 `conversation.input.overlay` 的标准属性（`useChat`、`useInput`、`useSession`、`inputActions`）与 `sessions.binding(id).session.loadOlder()`；DSH 升级后如果这些接口改名，需要回归
-- 问答回复依赖 DSH 的 `question-reply` 聊天节点与 `questions`/`answers` 形状；`dsh-client-ui-user-questions` 改名或改形状时回答行会消失，需要回归
 - 审批与计划审阅只有点击动作，没有可写回的文本，不进入输入历史
-- 新建会话依赖 `uiWorkspace.startSession`，DSH 0.2.2 之前没有这个方法
-- 文件搜索依赖 `ctx.get("remote.fileReferences")`，文件打开与预览依赖 `ctx.get("sidebarRight").openResource` 和 `dsh-resource://file/session/...` 地址；这两个都不是 DSH 的公开 API，DSH 升级后需要回归。它们按名字从共享服务表读取，缺了只会让文件模式报错，不会拖住整个插件加载
-- 文件检索与右侧栏预览都要求主区域有当前会话；停在主面板页面时文件模式只显示提示
-- 文件结果上限 20 条、忽略目录与索引上限都由 DSH 的 fileReferences 配置决定，插件不覆盖
-- 目录只能靠 Enter 补全钻进，没有单独的 Tab 补全；面板里的 Tab 仍是焦点切换
-- 侧问依赖宿主半区的 `webServer`、`agents`、`llm` 与 `sessionController`，它们写在 inject 里，缺任何一个整个插件都不会加载
-- 侧问记录只在内存，刷新页面即丢；分叉要求构建提供 `sessionController.fork`，否则宿主返回 501，面板只显示分叉失败
-- 侧问背景依赖待处理卡片的 `[data-approval-scroll]`、`[data-question-scroll]`、`[data-plan-review-key]` 与会话容器的 `[data-conversation-session]`；DSH 改这些选择器时背景会变空，问题本身仍能发出
-- 侧问是模态的：面板打开时审批卡与提问卡不可点，需要点卡片时先关闭面板；卡片正文仍会作为背景随请求发送
-- 侧问的流事件（`start`、`delta`、`usage`、`finish`、`done`、`error`）是插件自己的协议，宿主与客户端必须同版本；升级时两边一起换
-- 侧问请求体里的 `includeAttachments` 也是同版本协议，老客户端不发时宿主按 true 处理
-- 侧问的现场块依赖宿主全局事件 `agent/assistant-stream` 的 frame 形状（`start`、`chunk`、`end`）与 `agent.status`；DSH 改这些事件时现场块会退化为「没有可用现场」，历史投影不受影响
-- 工具调用与结果以文本形式发给侧问模型，不是真正的 tool-call 块；个别供应商对 reasoning 文本或图片块的处理不同，出错时先关掉附件再试
-- 快照的字符预算不估算图片与文件，附件很大时仍可能被供应商按 token 拒绝；超窗提示只覆盖文本部分
-- 子代理的内部会话不进入侧问；父会话的工具调用与结果仍在，只是看不到子代理自己的步骤
-- 侧问不携带 developer 消息（工具目录增删），它们对回答「在干什么」没有帮助
-- 设置页的两个偏好只影响快速切换器自己：附件开关只管侧问、不影响主对话，排序只管待处理组；偏好存浏览器 localStorage，换浏览器或清站点数据后回到默认值
-- 会话 ID 只认规范化后的前缀：不足 4 位、或从中间截一段都不命中；短码只显示规范化后至少 4 位的 id
-- 已归档会话不显示，需要先在侧栏取消归档
-- 访问时间从安装插件后开始记录，安装前的历史与清掉站点数据后的历史都会退回更新时间；没有访问历史时无法判断上个会话，列表直接从状态排序开始

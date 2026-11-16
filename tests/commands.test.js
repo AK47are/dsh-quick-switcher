@@ -12,7 +12,6 @@ import {
   parseRecentCommands,
   pushRecentCommand,
 } from "../src/modules/commands/recent.js";
-import { createCommandsRoute } from "../src/routes/commands.js";
 
 const catalog = [
   {

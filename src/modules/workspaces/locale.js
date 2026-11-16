@@ -1,27 +1,43 @@
-/* Workspace module copy, sliced from the shared dictionary during the migration. */
+/* Workspace module copy. */
 
-import { pickLocale } from "../../core/lib/locale-slice.js";
-import { en as allEn, zh as allZh } from "../../i18n.js";
+export const locale = {
+  zh: {
+    "placeholderWorkspaces": "搜索工作区标题或路径",
+    "searchAriaWorkspaces": "搜索工作区",
+    "listLabelWorkspaces": "工作区列表",
+    "emptyWorkspaces": "没有匹配的工作区",
+    "emptyWorkspaceSessions": "该工作区还没有会话",
+    "newSession": "新建会话",
+    "placeholderScope": "搜索该工作区的会话",
+    "listLabelScope": "该工作区的会话",
+    "searchAria": "搜索会话",
+    "hintViewSessions": "查看会话",
+    "hintNewSession": "新建会话",
+    "hintOpen": "打开",
+    "count": "{count} 个会话",
+    "countWorkspaces": "{count} 个工作区",
+    "empty": "没有匹配的会话",
+    "createFailed": "无法新建会话",
+    "workspacesTitle": "工作区",
+  },
+  en: {
+    "placeholderWorkspaces": "Search by workspace title or path",
+    "searchAriaWorkspaces": "Search workspaces",
+    "listLabelWorkspaces": "Workspaces",
+    "emptyWorkspaces": "No matching workspaces",
+    "emptyWorkspaceSessions": "This workspace has no sessions yet",
+    "newSession": "New session",
+    "placeholderScope": "Search this workspace's sessions",
+    "listLabelScope": "Workspace sessions",
+    "searchAria": "Search sessions",
+    "hintViewSessions": "view",
+    "hintNewSession": "new session",
+    "hintOpen": "open",
+    "count": "{count} sessions",
+    "countWorkspaces": "{count} workspaces",
+    "empty": "No matching sessions",
+    "createFailed": "Could not create a session",
+    "workspacesTitle": "Workspaces",
+  },
+};
 
-const KEYS = [
-  "placeholderWorkspaces",
-  "searchAriaWorkspaces",
-  "listLabelWorkspaces",
-  "emptyWorkspaces",
-  "emptyWorkspaceSessions",
-  "newSession",
-  "placeholderScope",
-  "listLabelScope",
-  "searchAria",
-  "hintViewSessions",
-  "hintNewSession",
-  "hintOpen",
-  "count",
-  "countWorkspaces",
-  "empty",
-  "createFailed",
-];
-
-export const locale = pickLocale(allZh, allEn, KEYS);
-locale.zh.workspacesTitle = "工作区";
-locale.en.workspacesTitle = "Workspaces";

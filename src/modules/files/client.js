@@ -1,6 +1,6 @@
 /* File module: "@" searches the current session's workspace files. */
 
-import { defineModule } from "../../core/module.js";
+import { defineModule, prefixMatcher } from "../../core/module.js";
 import { fuzzyMatch } from "../../core/lib/search.js";
 import { locale } from "./locale.js";
 import { fileAddress, splitFilePath } from "./path.js";
@@ -225,16 +225,12 @@ export default defineModule("files", (api) => {
 
       return {
         matchers: [
-          {
+          prefixMatcher("@", {
             id: "files",
             priority: 10,
-            match(query, context) {
-              return query.startsWith("@")
-                ? { filter: query.slice(1), sessionId: context.currentSessionId }
-                : null;
-            },
+            map: (filter, context) => ({ filter, sessionId: context.currentSessionId }),
             view,
-          },
+          }),
         ],
         dispose() {
           cancelPending();

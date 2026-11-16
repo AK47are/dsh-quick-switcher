@@ -1,6 +1,6 @@
 /* Command module: searchable DSH application commands. */
 
-import { defineModule } from "../../core/module.js";
+import { defineModule, prefixMatcher } from "../../core/module.js";
 import { filterEntries } from "../../core/lib/search.js";
 import { createRecentCommands } from "./recent.js";
 import { locale } from "./locale.js";
@@ -107,16 +107,7 @@ export default defineModule("commands", (api) => {
       store.refresh();
       const unsubscribe = store.subscribe(() => panel.notify());
       return {
-        matchers: [
-          {
-            id: "commands",
-            priority: 10,
-            match(query) {
-              return query.startsWith(">") ? { filter: query.slice(1) } : null;
-            },
-            view,
-          },
-        ],
+        matchers: [prefixMatcher(">", { id: "commands", priority: 10, view })],
         dispose: unsubscribe,
       };
     },

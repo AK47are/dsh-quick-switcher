@@ -1,16 +1,22 @@
-/* Side-question records, their streaming requests, and the fork call. */
+/* Side-question records, their streaming requests, and the "?" list and detail. */
 
-export const ASK_PATH = "/dsh-quick-switcher/ask";
-export const FORK_PATH = "/dsh-quick-switcher/fork";
+import { relativeTime } from "../../core/lib/format.js";
+import { buildPendingContext } from "./context.js";
+import { ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
+
+export { ASK_PATH, FORK_PATH, buildPendingContext };
 
 /** Re-render rate while an answer streams; text is kept on every chunk. */
-const DELTA_EMIT_MS = 50;
+export const ASK_DELTA_EMIT_MS = 50;
 
 /** Records kept per session; the oldest one is dropped first. */
-const RECORD_LIMIT = 20;
+export const ASK_RECORD_LIMIT = 20;
 
 /** Sessions whose records survive; the least recently asked is dropped. */
-const SESSION_LIMIT = 8;
+export const ASK_SESSION_LIMIT = 8;
+
+/** How long the footer shows "Copied" before the label settles back. */
+export const ASK_COPY_FEEDBACK_MS = 1600;
 
 /**
  * Statuses that earn a badge in the list.
@@ -117,9 +123,11 @@ async function refusalOf(response) {
  * write it can cause is the single user message a fork inserts into the new
  * session.
  *
- * `request`, `now`, and `translate` are injectable so tests can drive the
- * stream with a fake clock and a fake transport. The default `translate` is the
- * identity, which keeps the store importable outside the panel.
+ * `request`, `now`, `translate`, and `includeAttachments` are injectable so
+ * tests can drive the stream with a fake clock and a fake transport. The module
+ * passes a reader for the settings scope, so a preference change applies to the
+ * next question instead of to the copy of the store imported here. The default
+ * `translate` is the identity, which keeps the store usable outside the panel.
  */
 export function createAskStore({
   request = postJson,
@@ -188,7 +196,7 @@ export function createAskStore({
     for (let index = items.length - 1; index >= 0; index -= 1) {
       if (items[index].sessionId === sessionId) owned.push(index);
     }
-    for (const index of owned.slice(0, Math.max(0, owned.length - RECORD_LIMIT))) {
+    for (const index of owned.slice(0, Math.max(0, owned.length - ASK_RECORD_LIMIT))) {
       if (items[index].status === "running") continue;
       items.splice(index, 1);
     }
@@ -207,11 +215,11 @@ export function createAskStore({
     for (const item of items) {
       if (!newest.has(item.sessionId)) newest.set(item.sessionId, item.startedAt);
     }
-    if (newest.size <= SESSION_LIMIT) return;
+    if (newest.size <= ASK_SESSION_LIMIT) return;
     const keep = new Set(
       [...newest.entries()]
         .sort((left, right) => right[1] - left[1])
-        .slice(0, SESSION_LIMIT)
+        .slice(0, ASK_SESSION_LIMIT)
         .map(([sessionId]) => sessionId),
     );
     for (let index = items.length - 1; index >= 0; index -= 1) {
@@ -366,7 +374,7 @@ export function createAskStore({
     if (index < 0) return;
     items[index] = { ...items[index], answer: items[index].answer + text };
     const current = now();
-    if (current - lastDeltaEmit < DELTA_EMIT_MS) return;
+    if (current - lastDeltaEmit < ASK_DELTA_EMIT_MS) return;
     lastDeltaEmit = current;
     emit();
   }
@@ -465,7 +473,7 @@ export function createAskStore({
   /** Abort every request and drop every record; used when the plugin unloads. */
   function dispose() {
     for (const controller of controllers.values()) {
-      controller.abort(new Error("dsh-quick-switcher was unloaded"));
+      controller.abort(new Error(UNLOADED_MESSAGE));
     }
     controllers.clear();
     items.length = 0;
@@ -487,5 +495,388 @@ export function createAskStore({
         listeners.delete(listener);
       };
     },
+  };
+}
+
+/**
+ * Whether focus sits in a control that consumes plain letters.
+ *
+ * A locked side-question input matches too: it is read-only, but the user can
+ * still select and copy the question there, so C, R, F, and S must stay
+ * letters rather than shortcuts while it has focus.
+ */
+export function isEditableTarget(target) {
+  if (target === null || typeof target !== "object") return false;
+  if (target.isContentEditable === true) return true;
+  if (typeof target.closest !== "function") return false;
+  return (
+    target.closest(
+      'input, textarea, select, [contenteditable=""], [contenteditable="true"]',
+    ) !== null
+  );
+}
+
+/**
+ * Map one keydown inside the side-question detail to the action it triggers.
+ *
+ * `i` takes the vim insert meaning: it hands the keyboard back to the input.
+ * The quick switcher is a modal, so this panel owns the gesture. The detail
+ * has exactly one input, the question field it locks while reading, and `i`
+ * cannot type into a read-only field, so the gesture is read before the
+ * editable rule. Backspace is deliberately absent: one action gets one key,
+ * and inside a locked field Backspace shows no effect that could explain
+ * itself to the user.
+ *
+ * The other letters stay letters while that field has focus, because the user
+ * may be selecting the question to copy. A held key is dropped: returning to
+ * the list focuses the input, and a repeat must not fire the action twice.
+ * Composing keys and modifier chords belong to the browser and the input
+ * method.
+ *
+ * @param event - a keydown event shape (`key`, `repeat`, `isComposing`,
+ *   `keyCode`, and the three modifier flags).
+ * @param state - what the current view and record allow. Every flag is read
+ *   here so the caller keeps the store and the record as the single source of
+ *   truth.
+ * @returns {"back"|"stop"|"copy"|"regenerate"|"fork"|null}
+ */
+export function detailKeyAction(event, state) {
+  if (event === null || typeof event !== "object") return null;
+  if (state === null || typeof state !== "object") return null;
+  if (event.isComposing === true || event.keyCode === 229) return null;
+  if (event.repeat === true) return null;
+  if (event.metaKey === true || event.ctrlKey === true || event.altKey === true) {
+    return null;
+  }
+  if (typeof event.key !== "string") return null;
+  const key = event.key.toLowerCase();
+  // The locked question field matches the editable rule, and `i` still has to
+  // work there; every other letter keeps that field as a text surface.
+  if (key === "i") return state.hasBack === true ? "back" : null;
+  if (state.isEditable === true) return null;
+  if (key === "s") return state.isRunning === true ? "stop" : null;
+  if (key === "c") return state.canCopy === true ? "copy" : null;
+  if (key === "r") return state.canRegenerate === true ? "regenerate" : null;
+  if (key === "f") {
+    return state.canFork === true && state.isForking !== true ? "fork" : null;
+  }
+  return null;
+}
+
+/** Feedback the detail footer shows next to its copy and fork actions. */
+const EMPTY_UI = Object.freeze({ copied: false, copyFailed: false, forking: false });
+
+/**
+ * Create the tiny subscribable feedback store owned by one panel mount.
+ *
+ * The footer reads it through `useSyncExternalStore` and the shell's keydown
+ * handler reads the same snapshot, so a copied label and a running fork cannot
+ * disagree, and a fork key cannot start twice. The store lives on the mount
+ * instance because it belongs to one panel, unlike the records themselves.
+ */
+export function createAskUi({ setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+  let snapshot = EMPTY_UI;
+  const listeners = new Set();
+  let timer = 0;
+
+  function emit() {
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch (error) {
+        console.error("[dsh-quick-switcher] side question ui listener failed", error);
+      }
+    }
+  }
+
+  function set(patch) {
+    const next = { ...snapshot, ...patch };
+    if (
+      next.copied === snapshot.copied &&
+      next.copyFailed === snapshot.copyFailed &&
+      next.forking === snapshot.forking
+    ) {
+      return;
+    }
+    snapshot = next;
+    emit();
+  }
+
+  function cancelTimer() {
+    if (timer === 0) return;
+    clearTimer(timer);
+    timer = 0;
+  }
+
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    markCopied() {
+      cancelTimer();
+      set({ copied: true, copyFailed: false });
+      timer = setTimer(() => {
+        timer = 0;
+        set({ copied: false });
+      }, ASK_COPY_FEEDBACK_MS);
+    },
+    markCopyFailed() {
+      cancelTimer();
+      set({ copied: false, copyFailed: true });
+    },
+    clearCopy() {
+      cancelTimer();
+      set({ copied: false, copyFailed: false });
+    },
+    setForking(value) {
+      set({ forking: value === true });
+    },
+    dispose() {
+      cancelTimer();
+      listeners.clear();
+    },
+  };
+}
+
+/**
+ * Build the detail's actions for one mount.
+ *
+ * `back` is supplied by the view because the detail id belongs to the view;
+ * every other action takes the record the caller is looking at. Copy feedback
+ * goes through the mount ui store, so the button label and the key handler see
+ * one state. A fork failure keeps the panel open and is reported in place: the
+ * store failure names the fork, while a refused navigation keeps the same
+ * "could not open that session" text the session list uses.
+ */
+export function createAskActions({ api, store, ui, panel, back }) {
+  function openSession(sessionId) {
+    try {
+      const result = api.services.uiWorkspace.openSession(sessionId);
+      if (result !== null && typeof result === "object" && typeof result.catch === "function") {
+        result.catch(() => panel.setError(api.t("openFailed")));
+      }
+      return true;
+    } catch {
+      panel.setError(api.t("openFailed"));
+      return false;
+    }
+  }
+
+  async function copy(record) {
+    const answer = typeof record?.answer === "string" ? record.answer : "";
+    if (answer === "") return;
+    try {
+      await globalThis.navigator.clipboard.writeText(answer);
+      ui.markCopied();
+    } catch (failure) {
+      console.error("[dsh-quick-switcher] clipboard write failed", failure);
+      ui.markCopyFailed();
+    }
+  }
+
+  function stop(record) {
+    if (record === null || record === undefined) return;
+    store.stop(record.sessionId, record.id);
+  }
+
+  function regenerate(record) {
+    if (record === null || record === undefined) return;
+    store.regenerate(record.sessionId, record.id);
+  }
+
+  async function fork(record) {
+    if (record === null || record === undefined) return;
+    if (ui.getSnapshot().forking) return;
+    ui.setForking(true);
+    panel.setError(null);
+    try {
+      const childId = await store.fork(record.sessionId, record.id);
+      if (childId === null) return;
+      if (!openSession(childId)) return;
+      // The main area now shows a different conversation, so the caret must
+      // not return to the control that existed before the panel opened.
+      panel.close({ restoreFocus: false });
+    } catch (failure) {
+      console.error("[dsh-quick-switcher] side question fork failed", failure);
+      panel.setError(api.t("askForkFailed"));
+    } finally {
+      ui.setForking(false);
+    }
+  }
+
+  return { back, copy, stop, regenerate, fork };
+}
+
+/**
+ * Build the "?" view for one panel mount.
+ *
+ * The query text after `?` is the question, never a filter: a side question is
+ * one sentence the user wants answered, and matching history against it would
+ * only ever hide the row they need. `?` alone lists the current session's
+ * records, which is also where a half-finished answer can be reopened.
+ *
+ * The view owns one piece of navigation state, `detailId`. It survives a query
+ * change so a stream that lands while the detail is open keeps updating in
+ * place, and it is cleared by `back` rather than by the panel: the shell only
+ * renders what the view returns. A record can disappear only through the
+ * session cap, so a detail id that no longer resolves is dropped here instead
+ * of rendering a header that points at nothing.
+ *
+ * The store and ui are passed in so the view stays free of React and can be
+ * unit tested with plain Node.
+ */
+export function createAskView({ api, store, ui, actions }) {
+  let detailId = null;
+  /** Last non-null current session, used to abort its request on close. */
+  let lastSessionId = null;
+
+  function entriesOf(sessionId) {
+    if (sessionId === null) return [];
+    return store.entriesOf(sessionId) ?? [];
+  }
+
+  function back(panel) {
+    detailId = null;
+    panel.notify();
+  }
+
+  /**
+   * One history row. The badge only appears for states that need a word:
+   * a finished answer is the normal case.
+   */
+  function historyRow(record, panel) {
+    const time = relativeTime(record.startedAt, api.t, panel.now);
+    const labelKey = statusLabelKey(record);
+    return {
+      key: `a:h:${record.id}`,
+      title: record.question,
+      meta: time === "" ? [] : [{ text: time, className: "dqs-time" }],
+      badge: labelKey === null ? null : api.t(labelKey),
+      className: "dqs-ask-row",
+      run() {
+        detailId = record.id;
+        // The store already announced the new record; this second request
+        // makes the detail render even if that announcement is ever flushed
+        // before `detailId` was assigned.
+        panel.notify();
+        panel.setQuery(`?${record.question}`);
+      },
+    };
+  }
+
+  function detailView(record, panel) {
+    const id = record.id;
+    return {
+      placeholder: api.t("placeholderAsk"),
+      searchAria: api.t("searchAriaAsk"),
+      listLabel: api.t("listLabelAsk"),
+      rows: [],
+      // A detail view is not an empty list: the panel renders the component
+      // instead of the listbox, and an empty `rows` array keeps every other
+      // consumer of the view shape honest.
+      content: { kind: "ask", props: { id } },
+      footer: { kind: "ask", props: { id } },
+      inputLocked: true,
+      hints: [],
+      count: "",
+      keydown(event, context) {
+        // Read the record again instead of trusting the render: a late chunk
+        // may have changed what the record allows since the view was built.
+        const live = store.find(id) ?? record;
+        const action = detailKeyAction(event.nativeEvent ?? event, {
+          hasBack: true,
+          isEditable: isEditableTarget(event.target),
+          isRunning: isRunning(live),
+          canCopy: canCopy(live),
+          canRegenerate: canRegenerate(live),
+          canFork: canFork(live),
+          isForking: ui.getSnapshot().forking,
+        });
+        if (action === null) return false;
+        if (action === "back") back(context);
+        else if (action === "stop") actions.stop(live);
+        else if (action === "copy") void actions.copy(live);
+        else if (action === "regenerate") actions.regenerate(live);
+        else if (action === "fork") void actions.fork(live);
+        return true;
+      },
+    };
+  }
+
+  function view(state, panel) {
+    const currentId = panel.currentSessionId ?? null;
+    if (typeof currentId === "string" && currentId !== "") lastSessionId = currentId;
+
+    const detail = detailId === null ? null : store.find(detailId);
+    if (detailId !== null && detail === null) detailId = null;
+    if (detail !== null) return detailView(detail, panel);
+
+    const entries = entriesOf(currentId);
+    const running = entries.some((entry) => entry.status === "running");
+    const text = typeof state?.text === "string" ? state.text.trim() : "";
+    const rows = [];
+
+    // The ask row is only honest when there is a session to ask in and a
+    // question to send. It carries no `action` flag so typing keeps it as the
+    // default row.
+    if (text !== "" && currentId !== null) {
+      rows.push({
+        key: "a:q",
+        title: api.t("askRow", { question: text }),
+        meta: running ? [{ text: api.t("askBusy") }] : [],
+        className: "dqs-ask-row",
+        run:
+          running === true
+            ? undefined
+            : () => {
+                const record = store.ask(
+                  currentId,
+                  text,
+                  buildPendingContext(panel.pending, api.t, currentId),
+                );
+                if (record === null || record === undefined) return;
+                detailId = record.id;
+                // The store already announced the new record; this second
+                // request makes the detail render even if that announcement is
+                // ever flushed before `detailId` was assigned.
+                panel.notify();
+                panel.setQuery(`?${text}`);
+              },
+      });
+    }
+    for (const record of entries) rows.push(historyRow(record, panel));
+
+    let emptyText = null;
+    if (currentId === null) emptyText = api.t("askNoSession");
+    else if (rows.length === 0) emptyText = api.t("emptyAsk");
+
+    // With no text typed the running request is invisible otherwise: the
+    // list just looks like it has no way to ask anything.
+    const note = running && text === "" ? api.t("askRunningNote") : null;
+
+    const hints = [];
+    if (text !== "") hints.push({ keys: ["Enter"], label: api.t("hintAskSend") });
+    else if (entries.length > 0) hints.push({ keys: ["Enter"], label: api.t("hintAskView") });
+    hints.push({ keys: ["Esc"], label: api.t("hintClose") });
+
+    return {
+      placeholder: api.t("placeholderAsk"),
+      searchAria: api.t("searchAriaAsk"),
+      listLabel: api.t("listLabelAsk"),
+      rows,
+      emptyText,
+      note,
+      hints,
+      count: api.t("countAsk", { count: entries.length }),
+    };
+  }
+
+  return {
+    view,
+    back,
+    getDetailId: () => detailId,
+    getSessionId: () => lastSessionId,
   };
 }

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createAskStore } from "../src/ask-store.js";
+import {
+  ASK_PATH,
+  FORK_PATH,
+  canFork,
+  createAskStore,
+} from "../src/modules/ask/logic.js";
+import { UNLOADED_MESSAGE } from "../src/modules/ask/shared.js";
 
 const t = (key) => key;
 
@@ -53,6 +59,11 @@ async function flush() {
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
 }
+
+test("the client store calls the same host paths the host half serves", () => {
+  assert.equal(ASK_PATH, "/dsh-quick-switcher/ask");
+  assert.equal(FORK_PATH, "/dsh-quick-switcher/fork");
+});
 
 test("an answer streams into one record and finishes", async () => {
   const store = createAskStore({
@@ -181,7 +192,7 @@ test("regenerating clears the answer and asks the same question again", async ()
   assert.equal(seen[1].body.includeAttachments, true);
 });
 
-test("the attachment preference is captured when the question is asked", async () => {
+test("the settings reader is consulted at question time, not at import time", async () => {
   let include = false;
   const seen = [];
   const store = createAskStore({
@@ -280,4 +291,99 @@ test("at most eight sessions keep records", async () => {
   for (let index = 1; index < 9; index += 1) {
     assert.equal(store.entriesOf(`s${index}`).length, 1);
   }
+});
+
+test("fork posts the question, visible answer, prefix, and background", async () => {
+  const seen = [];
+  const store = createAskStore({
+    request: async (path, body) => {
+      seen.push({ path, body });
+      if (path === FORK_PATH) {
+        return { ok: true, status: 200, json: async () => ({ sessionId: "child" }) };
+      }
+      return responseOf(
+        heldStream(
+          sse(
+            { type: "start", atSeq: 4, model: "m" },
+            { type: "delta", text: "hi" },
+            { type: "done" },
+          ),
+        ),
+      );
+    },
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "why?", { text: "background", label: "Approval" });
+  await flush();
+  assert.equal(canFork(store.find(record.id)), true);
+
+  const child = await store.fork("s1", record.id);
+  assert.equal(child, "child");
+  assert.equal(seen[1].path, FORK_PATH);
+  assert.deepEqual(seen[1].body, {
+    sessionId: "s1",
+    question: "why?",
+    answer: "hi",
+    atSeq: 4,
+    context: "background",
+  });
+});
+
+test("fork refuses a record the user has nothing to continue from", async () => {
+  let requests = 0;
+  const store = createAskStore({
+    request: async (path) => {
+      requests += 1;
+      if (path === FORK_PATH) throw new Error("fork must not run");
+      return responseOf(heldStream(sse({ type: "start", atSeq: 2 })));
+    },
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q");
+  await flush();
+  // No answer yet, so there is no exchange to append.
+  assert.equal(await store.fork("s1", record.id), null);
+  assert.equal(requests, 1);
+});
+
+test("a refused fork surfaces the host message", async () => {
+  const store = createAskStore({
+    request: async (path) => {
+      if (path === FORK_PATH) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ error: "fork failed" }),
+        };
+      }
+      return responseOf(
+        heldStream(sse({ type: "start", atSeq: 0 }, { type: "delta", text: "hi" }, { type: "done" })),
+      );
+    },
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q");
+  await flush();
+  await assert.rejects(() => store.fork("s1", record.id), /fork failed/);
+});
+
+test("dispose aborts the live request and drops every record", async () => {
+  let signal;
+  const store = createAskStore({
+    request: (path, body, received) => {
+      signal = received;
+      return new Promise(() => {});
+    },
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q");
+  assert.equal(signal.aborted, false);
+  store.dispose();
+  assert.equal(signal.aborted, true);
+  assert.equal(signal.reason.message, UNLOADED_MESSAGE);
+  assert.equal(store.find(record.id), null);
 });

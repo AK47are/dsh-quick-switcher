@@ -1,29 +1,47 @@
-/* History module copy, sliced from the shared dictionary during the migration. */
+/* History module copy. */
 
-import { pickLocale } from "../../core/lib/locale-slice.js";
-import { en as allEn, zh as allZh } from "../../i18n.js";
+export const locale = {
+  zh: {
+    "historyCommandLabel": "输入历史",
+    "placeholderHistory": "搜索已发送的提示词与回答",
+    "searchAriaHistory": "搜索输入历史",
+    "listLabelHistory": "输入历史",
+    "emptyHistory": "还没有可回填的输入",
+    "emptyHistoryMatches": "没有匹配的输入",
+    "historyDraftBadge": "草稿",
+    "historySteeringBadge": "插话",
+    "historyAnswerBadge": "回答",
+    "historyLoadEarlier": "加载更早的输入",
+    "historyLoading": "正在加载更早的输入",
+    "historyApplied": "已填入输入框",
+    "historyApplyFailed": "无法填入输入框",
+    "historyLoadFailed": "无法加载更早的输入",
+    "historyFrozen": "正在发送，暂时不能填入",
+    "historyNoSession": "当前没有可用的会话",
+    "hintFill": "填入",
+    "countHistory": "{count} 条输入",
+    "historyTitle": "历史",
+  },
+  en: {
+    "historyCommandLabel": "Input history",
+    "placeholderHistory": "Search sent prompts and answers",
+    "searchAriaHistory": "Search input history",
+    "listLabelHistory": "Input history",
+    "emptyHistory": "No input yet",
+    "emptyHistoryMatches": "No matching input",
+    "historyDraftBadge": "Draft",
+    "historySteeringBadge": "Steer",
+    "historyAnswerBadge": "Answer",
+    "historyLoadEarlier": "Load earlier input",
+    "historyLoading": "Loading earlier input",
+    "historyApplied": "Filled into the input",
+    "historyApplyFailed": "Could not fill the input",
+    "historyLoadFailed": "Could not load earlier input",
+    "historyFrozen": "Sending, so the input cannot take text yet",
+    "historyNoSession": "No active session",
+    "hintFill": "fill",
+    "countHistory": "{count} inputs",
+    "historyTitle": "History",
+  },
+};
 
-const KEYS = [
-  "historyCommandLabel",
-  "placeholderHistory",
-  "searchAriaHistory",
-  "listLabelHistory",
-  "emptyHistory",
-  "emptyHistoryMatches",
-  "historyDraftBadge",
-  "historySteeringBadge",
-  "historyAnswerBadge",
-  "historyLoadEarlier",
-  "historyLoading",
-  "historyApplied",
-  "historyApplyFailed",
-  "historyLoadFailed",
-  "historyFrozen",
-  "historyNoSession",
-  "hintFill",
-  "countHistory",
-];
-
-export const locale = pickLocale(allZh, allEn, KEYS);
-locale.zh.historyTitle = "历史";
-locale.en.historyTitle = "History";

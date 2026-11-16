@@ -48,6 +48,50 @@ export function defineModule(id, setup) {
  */
 
 /**
+ * Build a matcher from a leading trigger.
+ *
+ * The common case is a prefix: `prefixMatcher(">", { id, view })` claims every
+ * query that starts with ">" and hands the rest to the view as `{ filter }`.
+ * Pass `map` for a different state shape, and `priority` when another module
+ * can claim the same query. A matcher built here is a plain object, so a module
+ * may still write `match` by hand for suffix, regex or stateful triggers.
+ *
+ * @param {string} prefix
+ * @param {{
+ *   id: string,
+ *   view: (state: unknown, panel: PanelContext) => PanelView,
+ *   priority?: number,
+ *   map?: (text: string, panel: PanelContext) => unknown,
+ * }} options
+ * @returns {Matcher}
+ */
+export function prefixMatcher(prefix, options) {
+  if (typeof prefix !== "string") {
+    throw new TypeError("dsh-quick-switcher: prefixMatcher needs a string prefix");
+  }
+  const { id, view, priority = 0, map } = options ?? {};
+  if (typeof id !== "string" || id === "") {
+    throw new TypeError("dsh-quick-switcher: prefixMatcher needs a matcher id");
+  }
+  if (typeof view !== "function") {
+    throw new TypeError(`dsh-quick-switcher: prefixMatcher "${id}" needs a view function`);
+  }
+  if (map !== undefined && typeof map !== "function") {
+    throw new TypeError(`dsh-quick-switcher: prefixMatcher "${id}" map must be a function`);
+  }
+  const stateOf = map ?? ((text) => ({ filter: text }));
+  return {
+    id,
+    priority,
+    match(query, panel) {
+      if (typeof query !== "string" || !query.startsWith(prefix)) return null;
+      return stateOf(query.slice(prefix.length), panel);
+    },
+    view,
+  };
+}
+
+/**
  * Static capabilities handed to every module setup once per plugin load.
  *
  * @typedef {object} ModuleApi

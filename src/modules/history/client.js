@@ -1,6 +1,6 @@
 /* History module: the "!" list, its composer bridge and the history command. */
 
-import { defineModule } from "../../core/module.js";
+import { defineModule, prefixMatcher } from "../../core/module.js";
 import { HistoryBridge } from "./bridge.js";
 import { locale } from "./locale.js";
 import { createHistoryStore, createHistoryView } from "./logic.js";
@@ -72,16 +72,7 @@ export default defineModule("history", (api) => {
       const view = createHistoryView({ api, store, draftAtOpen });
       const unsubscribe = store.subscribe(() => panel.notify());
       return {
-        matchers: [
-          {
-            id: "history",
-            priority: 10,
-            match(query) {
-              return query.startsWith("!") ? { filter: query.slice(1) } : null;
-            },
-            view,
-          },
-        ],
+        matchers: [prefixMatcher("!", { id: "history", priority: 10, view })],
         dispose: unsubscribe,
       };
     },

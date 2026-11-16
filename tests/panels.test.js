@@ -5,7 +5,6 @@ import {
   createPanelStore,
   resolvePanelLabel,
 } from "../src/modules/panels/logic.js";
-import { createPanelsRoute } from "../src/routes/panels.js";
 
 /** Registrations shaped like the slot entries the sidebar also reads. */
 const registrations = [

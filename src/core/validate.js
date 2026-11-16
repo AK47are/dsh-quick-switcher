@@ -3,6 +3,10 @@
 import { API_VERSION } from "../../module.js";
 
 const ID_PATTERN = /^[a-z][a-z0-9-]*$/u;
+// Settings paths are camelCase in the contract (`ask.includeAttachments`), so
+// group and field ids accept capitals and hyphens while module and matcher ids
+// keep the kebab form.
+const SETTINGS_ID_PATTERN = /^[a-z][a-zA-Z0-9-]*$/u;
 const FIELD_TYPES = new Set(["boolean", "choice", "number", "custom"]);
 
 function fail(moduleId, message) {
@@ -108,7 +112,7 @@ function validateSettings(moduleId, settings) {
     if (!isPlainObject(group)) fail(moduleId, `settings group ${index} must be an object`);
     const id = group.id;
     if (id !== undefined) {
-      if (typeof id !== "string" || !ID_PATTERN.test(id)) {
+      if (typeof id !== "string" || !SETTINGS_ID_PATTERN.test(id)) {
         fail(moduleId, `settings group id ${JSON.stringify(id)} is invalid`);
       }
       if (groupIds.has(id)) fail(moduleId, `settings group "${id}" is declared twice`);
@@ -135,7 +139,7 @@ function validateField(moduleId, field, fieldIds, groupIndex, fieldIndex) {
   if (!isPlainObject(field)) {
     fail(moduleId, `settings field ${groupIndex}.${fieldIndex} must be an object`);
   }
-  if (typeof field.id !== "string" || !ID_PATTERN.test(field.id)) {
+  if (typeof field.id !== "string" || !SETTINGS_ID_PATTERN.test(field.id)) {
     fail(moduleId, `settings field id ${JSON.stringify(field.id)} is invalid`);
   }
   if (fieldIds.has(field.id)) {

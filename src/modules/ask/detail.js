@@ -1,11 +1,57 @@
 /* Side-question detail and its action bar, rendered inside the switcher card. */
 
 import React from "react";
-import { formatUsage } from "../data/format.js";
-import { renderMarkdown } from "../ask-markdown.js";
-import { canCopy, canFork, canRegenerate, isRunning, statusLabelKey } from "../ask-store.js";
+import { formatUsage } from "../../core/lib/format.js";
+import { canCopy, canFork, canRegenerate, isRunning, statusLabelKey } from "./logic.js";
+import { renderMarkdown } from "./markdown.js";
 
 const h = React.createElement;
+
+/** Stable no-op used while the mount surface is missing a subscription. */
+function noopSubscribe() {
+  return () => {};
+}
+
+/**
+ * Read one record from the mount's store.
+ *
+ * The store replaces a record object on every patch, so the snapshot is stable
+ * between notifications and React can tear-free re-read it while an answer
+ * streams. A missing store (a mount that never published one) resolves null
+ * instead of throwing, which keeps one broken surface from taking the panel
+ * down; the shell still renders what the view returned.
+ */
+function useAskRecord(instance, id) {
+  const store = instance !== null && typeof instance === "object" ? instance.store : null;
+  const subscribe = React.useCallback(
+    (listener) =>
+      typeof store?.subscribe === "function" ? store.subscribe(listener) : noopSubscribe(),
+    [store],
+  );
+  const getSnapshot = React.useCallback(
+    () => (typeof store?.find === "function" ? store.find(id) : null),
+    [store, id],
+  );
+  return React.useSyncExternalStore(subscribe, getSnapshot);
+}
+
+/** Read the mount's copy and fork feedback snapshot. */
+function useAskUi(instance) {
+  const ui = instance !== null && typeof instance === "object" ? instance.ui : null;
+  const subscribe = React.useCallback(
+    (listener) =>
+      typeof ui?.subscribe === "function" ? ui.subscribe(listener) : noopSubscribe(),
+    [ui],
+  );
+  const getSnapshot = React.useCallback(
+    () => (typeof ui?.getSnapshot === "function" ? ui.getSnapshot() : NO_UI),
+    [ui],
+  );
+  return React.useSyncExternalStore(subscribe, getSnapshot);
+}
+
+/** What the footer reads before or without a mount ui store. */
+const NO_UI = Object.freeze({ copied: false, copyFailed: false, forking: false });
 
 /**
  * One action in the detail bar: the panel's keycap plus a clickable label.
@@ -41,7 +87,12 @@ function ActionButton({ label, keyLabel, shortcut, onClick, disabled }) {
  * Auto-follow only runs while the reader is already at the bottom. Scrolling up
  * to reread an earlier paragraph must not be undone by the next chunk.
  */
-export function AskDetail({ record, t }) {
+export function AskDetail({ descriptor, instance, t }) {
+  const id = descriptor?.props?.id ?? null;
+  const record = useAskRecord(instance, id);
+  const answer = record === null ? "" : record.answer;
+  const status = record === null ? "" : record.status;
+
   const scrollRef = React.useRef(null);
   const followRef = React.useRef(true);
 
@@ -59,7 +110,9 @@ export function AskDetail({ record, t }) {
     const node = scrollRef.current;
     if (node === null || !followRef.current) return;
     node.scrollTop = node.scrollHeight;
-  }, [record.answer, record.status]);
+  }, [answer, status]);
+
+  if (record === null) return null;
 
   const onScroll = () => {
     const node = scrollRef.current;
@@ -68,19 +121,18 @@ export function AskDetail({ record, t }) {
   };
 
   const running = isRunning(record);
-  const answer = record.answer;
   const usage = formatUsage(record.usage, t);
   const labelKey = statusLabelKey(record);
 
-  const status = [];
+  const badges = [];
   if (record.model !== "") {
-    status.push(h("span", { key: "model", className: "dqs-ask-meta" }, record.model));
+    badges.push(h("span", { key: "model", className: "dqs-ask-meta" }, record.model));
   }
   if (usage !== "") {
-    status.push(h("span", { key: "usage", className: "dqs-ask-meta" }, usage));
+    badges.push(h("span", { key: "usage", className: "dqs-ask-meta" }, usage));
   }
   if (labelKey !== null) {
-    status.push(
+    badges.push(
       h("span", { key: "badge", className: "dqs-ask-badge" }, t(labelKey)),
     );
   }
@@ -109,9 +161,9 @@ export function AskDetail({ record, t }) {
       "aria-label": t("askAnswerLabel"),
       onScroll,
     },
-    status.length === 0
+    badges.length === 0
       ? null
-      : h("div", { className: "dqs-ask-status" }, status),
+      : h("div", { className: "dqs-ask-status" }, badges),
     record.context === ""
       ? null
       : h(
@@ -148,8 +200,27 @@ export function AskDetail({ record, t }) {
  * so a keyboard user never has to tab here. The bar reuses the list footer's
  * keycap hints: actions on the left, the close hint on the right, and no
  * button frame of its own.
+ *
+ * Copy feedback comes from the mount ui store, and a record id or status change
+ * clears it: a new answer makes an earlier "Copied" a lie.
  */
-export function AskFooter({ record, t, ui, actions }) {
+export function AskFooter({ descriptor, instance, panel, t }) {
+  const id = descriptor?.props?.id ?? null;
+  const record = useAskRecord(instance, id);
+  const ui = useAskUi(instance);
+  const actions =
+    instance !== null && typeof instance === "object" ? instance.actions : null;
+
+  const recordId = record === null ? null : record.id;
+  const recordStatus = record === null ? null : record.status;
+  React.useEffect(() => {
+    if (instance !== null && typeof instance === "object") {
+      instance.ui?.clearCopy?.();
+    }
+  }, [instance, recordId, recordStatus]);
+
+  if (record === null || actions === null || actions === undefined) return null;
+
   const running = isRunning(record);
   const buttons = [];
   if (running) {
@@ -159,7 +230,7 @@ export function AskFooter({ record, t, ui, actions }) {
         label: t("askStop"),
         keyLabel: "S",
         shortcut: "s",
-        onClick: actions.stop,
+        onClick: () => actions.stop(record),
       }),
     );
   }
@@ -175,7 +246,9 @@ export function AskFooter({ record, t, ui, actions }) {
         label,
         keyLabel: "C",
         shortcut: "c",
-        onClick: actions.copy,
+        onClick: () => {
+          void actions.copy(record);
+        },
       }),
     );
   }
@@ -186,7 +259,7 @@ export function AskFooter({ record, t, ui, actions }) {
         label: t("askRegenerate"),
         keyLabel: "R",
         shortcut: "r",
-        onClick: actions.regenerate,
+        onClick: () => actions.regenerate(record),
       }),
     );
   }
@@ -197,7 +270,9 @@ export function AskFooter({ record, t, ui, actions }) {
         label: ui.forking ? t("askForking") : t("askFork"),
         keyLabel: "F",
         shortcut: "f",
-        onClick: actions.fork,
+        onClick: () => {
+          void actions.fork(record);
+        },
         disabled: ui.forking,
       }),
     );
@@ -208,7 +283,7 @@ export function AskFooter({ record, t, ui, actions }) {
       label: t("askBack"),
       keyLabel: "I",
       shortcut: "i",
-      onClick: actions.back,
+      onClick: () => actions.back(panel),
     }),
   );
 

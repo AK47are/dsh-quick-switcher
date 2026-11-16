@@ -79,6 +79,33 @@ test("settings need a label, at least one group, and unique ids", () => {
   );
 });
 
+test("settings ids accept the camelCase field names the settings paths use", () => {
+  const spec = validateSpec("alpha", {
+    settings: settingsOf({
+      groups: [
+        {
+          id: "searchGroup",
+          fields: [
+            { id: "includeAttachments", type: "boolean", default: true, labelKey: "a" },
+            { id: "pendingOrder", type: "number", default: 1, labelKey: "b" },
+          ],
+        },
+      ],
+    }),
+  });
+  assert.equal(spec.settings.groups[0].fields[0].id, "includeAttachments");
+  assert.equal(spec.settings.groups[0].id, "searchGroup");
+  assert.throws(
+    () =>
+      validateSpec("alpha", {
+        settings: settingsOf({
+          groups: [{ fields: [{ id: "Bad.Field", type: "boolean", default: true }] }],
+        }),
+      }),
+    /field id/,
+  );
+});
+
 test("each field type validates its own default and range", () => {
   assert.throws(
     () =>

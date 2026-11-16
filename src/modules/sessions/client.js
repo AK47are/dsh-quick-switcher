@@ -1,6 +1,6 @@
 /* Sessions module: the default list, its shared data and the access clock. */
 
-import { defineModule } from "../../core/module.js";
+import { defineModule, prefixMatcher } from "../../core/module.js";
 import {
   PENDING_ORDER_LEAST_RECENT,
   PENDING_ORDER_MOST_RECENT,
@@ -75,16 +75,9 @@ export default defineModule("sessions", (api) => {
       const unsubscribe = shared.subscribe(() => panel.notify());
       return {
         matchers: [
-          {
-            id: "sessions",
-            // The catch-all list must never outrank a module that declares a
-            // trigger, including an external module with the default priority.
-            priority: -1000,
-            match(query) {
-              return { filter: query };
-            },
-            view,
-          },
+          // The catch-all list must never outrank a module that declares a
+          // trigger, including an external module with the default priority.
+          prefixMatcher("", { id: "sessions", priority: -1000, view }),
         ],
         dispose: unsubscribe,
       };

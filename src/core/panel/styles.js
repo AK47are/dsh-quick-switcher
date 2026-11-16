@@ -353,56 +353,7 @@ export const STYLE = `
         line-height: 17px;
       }
       .dqs-ask-answer {
-        color: var(--dsw-alias-label-primary);
-        font-size: 14px;
-        line-height: 22px;
-        overflow-wrap: anywhere;
-      }
-      .dqs-ask-p {
-        margin: 0 0 10px;
-      }
-      .dqs-ask-h {
-        margin: 4px 0 8px;
-        font-size: 14px;
-        font-weight: 600;
-        line-height: 21px;
-      }
-      .dqs-ask-list {
-        margin: 0 0 10px;
-        padding-left: 20px;
-      }
-      .dqs-ask-quote {
-        margin: 0 0 10px;
-        padding: 2px 10px;
-        border-left: 2px solid var(--dsw-alias-border-l1);
-        color: var(--dsw-alias-label-secondary);
-      }
-      .dqs-ask-pre {
-        margin: 0 0 10px;
-        padding: 10px 12px;
-        overflow-x: auto;
-        border: 0.5px solid var(--dsw-alias-border-l1);
-        border-radius: 8px;
-        background: var(--dsw-alias-bg-layer-2);
-        font-size: 12px;
-        line-height: 18px;
-      }
-      .dqs-ask-pre code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      }
-      .dqs-ask-inline-code {
-        padding: 0 4px;
-        border-radius: 4px;
-        background: var(--dsw-alias-bg-layer-2);
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 12px;
-      }
-      .dqs-ask-link {
-        color: var(--dsw-alias-brand-primary);
-        text-decoration: none;
-      }
-      .dqs-ask-link:hover {
-        text-decoration: underline;
+        min-width: 0;
       }
       .dqs-ask-thinking {
         display: inline-flex;

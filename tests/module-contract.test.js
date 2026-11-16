@@ -17,11 +17,14 @@ import { buildSettingsModel } from "../src/core/settings/model.js";
  * The three UI-bearing modules import React, which node --test cannot resolve
  * and the project deliberately keeps out of devDependencies. esbuild is already
  * the build tool, so the test bundles the manifest once with the stub and
- * imports the result from a temporary directory.
+ * imports the result from a temporary directory. The DSH primitives are stubbed
+ * for the same reason: the host provides them at runtime, and a detail view
+ * only needs their type identity to place an element.
  */
 async function loadClientModules() {
   const entry = fileURLToPath(new URL("../src/modules/client-manifest.js", import.meta.url));
   const stub = fileURLToPath(new URL("./react-stub.js", import.meta.url));
+  const primitives = fileURLToPath(new URL("./primitives-stub.js", import.meta.url));
   const result = await build({
     entryPoints: [entry],
     bundle: true,
@@ -31,9 +34,13 @@ async function loadClientModules() {
     logLevel: "silent",
     plugins: [
       {
-        name: "react-stub",
+        name: "dsh-stubs",
         setup(builder) {
           builder.onResolve({ filter: /^react$/ }, () => ({ path: stub }));
+          builder.onResolve(
+            { filter: /^@deepseek-ai\/dsh-client-ui-primitives$/ },
+            () => ({ path: primitives }),
+          );
         },
       },
     ],

@@ -1,9 +1,9 @@
 /* Side-question detail and its action bar, rendered inside the switcher card. */
 
 import React from "react";
+import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
 import { formatUsage } from "../../core/lib/format.js";
 import { canCopy, canFork, canRegenerate, isRunning, statusLabelKey } from "./logic.js";
-import { renderMarkdown } from "./markdown.js";
 
 const h = React.createElement;
 
@@ -54,6 +54,47 @@ function useAskUi(instance) {
 const NO_UI = Object.freeze({ copied: false, copyFailed: false, forking: false });
 
 /**
+ * Copy the shared Markdown renderer needs for code blocks and footnotes.
+ *
+ * The primitive only reads these labels when the answer actually contains a
+ * fenced block or a footnote, but a missing code object throws in those cases,
+ * so the full shape is always supplied. The identity of the returned object is
+ * part of the contract: the streaming parser is keyed on the labels reference,
+ * so a fresh object per streamed chunk would rebuild the parser and re-parse
+ * the whole answer. The cache below is keyed by the translated strings, which
+ * gives one object per language and keeps a language switch cheap.
+ */
+let labelCache = null;
+
+function markdownLabels(t) {
+  const values = [
+    t("askCodeCopy"),
+    t("askCodeCopied"),
+    t("askCodeTitle"),
+    t("askCodeWrap"),
+    t("askCodeUnwrap"),
+    t("askFootnotes"),
+  ];
+  if (
+    labelCache !== null &&
+    labelCache.values.every((value, index) => value === values[index])
+  ) {
+    return labelCache.labels;
+  }
+  const [copyLabel, copiedLabel, codeLabel, wrapLabel, unwrapLabel, footnotes] = values;
+  const labels = {
+    code: {
+      copyLabel,
+      copiedLabel,
+      toolbarLabels: { codeLabel, wrapLabel, unwrapLabel },
+    },
+    footnotes,
+  };
+  labelCache = { values, labels };
+  return labels;
+}
+
+/**
  * One action in the detail bar: the panel's keycap plus a clickable label.
  *
  * The key reuses the keycap class the list footer already uses, so both bars
@@ -95,6 +136,7 @@ export function AskDetail({ descriptor, instance, t }) {
 
   const scrollRef = React.useRef(null);
   const followRef = React.useRef(true);
+  const labels = markdownLabels(t);
 
   React.useEffect(() => {
     const node = scrollRef.current;
@@ -155,7 +197,15 @@ export function AskDetail({ descriptor, instance, t }) {
       t("askThinking"),
     );
   } else if (answer !== "") {
-    body = renderMarkdown(answer);
+    // The session panel and a side question render answers with the same
+    // primitive, so links, tables, math, and code blocks look the same and only
+    // the card around them belongs to this plugin. Streaming has to be passed
+    // through: the settled pass is the one that finishes math and file mentions.
+    body = h(primitives.MarkdownText, {
+      text: answer,
+      streaming: running,
+      labels,
+    });
   } else if (record.status === "done") {
     body = h("span", { className: "dqs-ask-meta" }, t("askEmptyAnswer"));
   }

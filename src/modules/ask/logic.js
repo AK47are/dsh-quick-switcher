@@ -2,9 +2,7 @@
 
 import { relativeTime } from "../../core/lib/format.js";
 import { buildPendingContext } from "./context.js";
-import { ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
-
-export { ASK_PATH, FORK_PATH, buildPendingContext };
+import { ASK_EVENTS, ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
 
 /** Re-render rate while an answer streams; text is kept on every chunk. */
 export const ASK_DELTA_EMIT_MS = 50;
@@ -329,27 +327,27 @@ export function createAskStore({
     // `done` arriving after the user pressed stop would erase the aborted mark.
     if (current.status !== "running") return;
     switch (payload.type) {
-      case "start":
+      case ASK_EVENTS.start:
         patch(id, {
           atSeq: typeof payload.atSeq === "number" ? payload.atSeq : null,
           model: typeof payload.model === "string" ? payload.model : "",
         });
         return;
-      case "delta":
+      case ASK_EVENTS.delta:
         if (typeof payload.text !== "string" || payload.text === "") return;
         appendDelta(id, payload.text);
         return;
-      case "usage":
+      case ASK_EVENTS.usage:
         patch(id, { usage: payload.usage ?? null });
         return;
-      case "finish":
+      case ASK_EVENTS.finish:
         // The reason is informational; `done` is what closes the record.
         return;
-      case "done":
+      case ASK_EVENTS.done:
         if (controllers.get(id) !== undefined) controllers.delete(id);
         patch(id, { status: "done" });
         return;
-      case "error":
+      case ASK_EVENTS.error:
         patch(id, {
           status: "error",
           error:
@@ -880,3 +878,4 @@ export function createAskView({ api, store, ui, actions }) {
     getSessionId: () => lastSessionId,
   };
 }
+

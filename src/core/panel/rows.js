@@ -16,7 +16,7 @@ export function Keycap({ children }) {
  * the modifier separator into its own "+" entry on Windows. That separator is
  * punctuation rather than a key, so it renders as text instead of a keycap.
  */
-export function Keycaps({ keys }) {
+function Keycaps({ keys }) {
   return h(
     "span",
     { className: "dqs-keys" },
@@ -79,7 +79,7 @@ export function CloseGlyph() {
  * ring, so this panel inherits every future shape and color change instead
  * of maintaining a second spinner.
  */
-export function SessionStatusDot({ state, label }) {
+function SessionStatusDot({ state, label }) {
   return h(
     "span",
     {
@@ -93,7 +93,7 @@ export function SessionStatusDot({ state, label }) {
 }
 
 /** Render a title with the matched characters wrapped in `mark`. */
-export function highlightTitle(text, positions) {
+function highlightTitle(text, positions) {
   if (!positions || positions.size === 0) return text;
   const sorted = [...positions].sort((left, right) => left - right);
   const parts = [];
@@ -120,9 +120,9 @@ export function highlightTitle(text, positions) {
 }
 
 /**
- * One row in the active route's list.
+ * One row in the active matcher's list.
  *
- * A route decides what to show by filling the uniform row shape; the panel
+ * A matcher decides what to show by filling the uniform row shape; the panel
  * only owns selection, icons, status, badges, click dispatch, and the Alt+digit
  * hint on the first nine rows.
  *

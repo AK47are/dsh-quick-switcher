@@ -1,4 +1,4 @@
-/* Whole-query fuzzy ranking shared by every route. */
+/* Whole-query fuzzy ranking shared by every matcher. */
 
 import { ID_PREFIX_MIN, idKeyOf } from "./ids.js";
 
@@ -162,7 +162,7 @@ export function fuzzyMatch(text, query) {
  * is the primary field: a hit there keeps its highlight positions. A row whose
  * primary field misses still participates when `metaLower` (workspace, path,
  * or command aliases) matches, at a fixed penalty and without a title
- * highlight. Empty input keeps the route's own order; every route supplies its
+ * highlight. Empty input keeps the matcher's own order; every matcher supplies its
  * base order before calling this function.
  *
  * `idKey` is an optional second secondary field with its own rule: a query of
@@ -172,7 +172,7 @@ export function fuzzyMatch(text, query) {
  * contiguous start alignment and keeps the same penalty and no highlight.
  *
  * `limit` defaults to the panel's shared result cap. History raises it because
- * one prompt row is a single line and the route caps its own collection first.
+ * one prompt row is a single line and the matcher caps its own collection first.
  */
 export function filterEntries(entries, query, limit = RESULT_LIMIT) {
   const cap =

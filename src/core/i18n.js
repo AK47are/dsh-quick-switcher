@@ -10,7 +10,6 @@
 
 export function createTranslator({ locale, dictionaries = {} } = {}) {
   const modules = new Map();
-  const listeners = new Set();
 
   function language() {
     try {
@@ -63,27 +62,10 @@ export function createTranslator({ locale, dictionaries = {} } = {}) {
       throw new Error(`dsh-quick-switcher: locale for module "${moduleId}" is already registered`);
     }
     modules.set(moduleId, table);
-    emit();
     return () => {
       modules.delete(moduleId);
-      emit();
     };
   }
 
-  function subscribe(listener) {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  }
-
-  function emit() {
-    for (const listener of [...listeners]) {
-      try {
-        listener();
-      } catch (error) {
-        console.error("[dsh-quick-switcher] locale listener failed", error);
-      }
-    }
-  }
-
-  return { t, add, subscribe, language };
+  return { t, add, language };
 }

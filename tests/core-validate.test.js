@@ -84,7 +84,7 @@ test("settings ids accept the camelCase field names the settings paths use", () 
     settings: settingsOf({
       groups: [
         {
-          id: "searchGroup",
+          id: "search-group",
           fields: [
             { id: "includeAttachments", type: "boolean", default: true, labelKey: "a" },
             { id: "pendingOrder", type: "number", default: 1, labelKey: "b" },
@@ -94,7 +94,16 @@ test("settings ids accept the camelCase field names the settings paths use", () 
     }),
   });
   assert.equal(spec.settings.groups[0].fields[0].id, "includeAttachments");
-  assert.equal(spec.settings.groups[0].id, "searchGroup");
+  assert.equal(spec.settings.groups[0].id, "search-group");
+  assert.throws(
+    () =>
+      validateSpec("alpha", {
+        settings: settingsOf({
+          groups: [{ fields: [{ id: "pending-order", type: "boolean", default: true }] }],
+        }),
+      }),
+    /field id/,
+  );
   assert.throws(
     () =>
       validateSpec("alpha", {

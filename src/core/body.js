@@ -8,6 +8,7 @@
  * shell, the controller and the registry never import a DSH service directly.
  */
 
+import { API_VERSION } from "../../module.js";
 import { createTranslator } from "./i18n.js";
 import { en as coreEn, zh as coreZh } from "./i18n-keys.js";
 import { createPanelController } from "./panel/controller.js";
@@ -17,7 +18,7 @@ import { createRegistry } from "./registry.js";
 import { createSettingsSection } from "./settings/page.js";
 import { createSettingsStore } from "./settings/store.js";
 
-export const NS = "dsh-quick-switcher";
+const NS = "dsh-quick-switcher";
 const OPEN_COMMAND_ID = "quickSwitcher.open";
 
 const OPEN_ALIASES = [
@@ -208,7 +209,7 @@ export function createBody({ ctx, modules }) {
   );
 
   const service = {
-    apiVersion: 1,
+    apiVersion: API_VERSION,
     register: (definition) => registry.register(definition),
     panel: panelApi,
   };

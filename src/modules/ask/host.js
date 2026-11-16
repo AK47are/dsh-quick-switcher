@@ -25,7 +25,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { defineHostModule } from "../../core/host/module.js";
-import { ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
+import { ASK_EVENTS, ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
 
 const MAX_BODY_BYTES = 262144;
 const MAX_QUESTION_CHARS = 16384;
@@ -193,7 +193,7 @@ async function askRoute(ctx, running, live, request, response) {
     }
   };
   send({
-    type: "start",
+    type: ASK_EVENTS.start,
     atSeq: snapshot.atSeq,
     provider: selection.provider,
     model: selection.model,
@@ -213,16 +213,16 @@ async function askRoute(ctx, running, live, request, response) {
     for await (const chunk of ctx.llm.stream(options)) {
       if (chunk === null || typeof chunk !== "object") continue;
       if (chunk.type === "text-delta" && typeof chunk.text === "string" && chunk.text !== "") {
-        send({ type: "delta", text: chunk.text });
+        send({ type: ASK_EVENTS.delta, text: chunk.text });
       } else if (chunk.type === "usage") {
-        send({ type: "usage", usage: chunk.usage });
+        send({ type: ASK_EVENTS.usage, usage: chunk.usage });
       } else if (chunk.type === "finish") {
-        send({ type: "finish", reason: chunk.reason });
+        send({ type: ASK_EVENTS.finish, reason: chunk.reason });
       }
     }
-    send({ type: "done" });
+    send({ type: ASK_EVENTS.done });
   } catch (error) {
-    if (!controller.signal.aborted) send({ type: "error", message: messageOf(error) });
+    if (!controller.signal.aborted) send({ type: ASK_EVENTS.error, message: messageOf(error) });
   } finally {
     finish();
   }
@@ -964,4 +964,5 @@ function messageOf(error) {
     return "unknown error";
   }
 }
+
 

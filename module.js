@@ -179,7 +179,7 @@ export function prefixMatcher(prefix, options) {
  * @property {unknown} pending
  * @property {number} now
  * @property {string} query
- * @property {string} t (key: string, params?: object) => string
+ * @property {(key: string, params?: object) => string} t
  * @property {Record<string, unknown>} services
  * @property {(name: string) => unknown} get
  * @property {(options?: { restoreFocus?: boolean }) => void} close
@@ -217,6 +217,7 @@ export function prefixMatcher(prefix, options) {
  * @property {string} [className]
  * @property {string} [titleClassName]
  * @property {string} [icon]
+ * @property {string[]} [keys] keycaps shown at the row's trailing edge
  * @property {string|null} [badge]
  * @property {{ state: string, label?: string }|null} [status]
  * @property {string|null} [trailing]

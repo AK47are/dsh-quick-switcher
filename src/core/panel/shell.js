@@ -53,6 +53,7 @@ export function SwitcherShell({
   const skipRestore = React.useRef(false);
   const rowRefs = React.useRef(new Map());
   const mountedRef = React.useRef(null);
+  const reportedViewErrors = React.useRef(new Set());
   const queryRef = React.useRef(query);
   queryRef.current = query;
   const latest = React.useRef({ currentSessionId, activePanelId, pending });
@@ -154,6 +155,17 @@ export function SwitcherShell({
     contentShown && view.footer !== null ? mounted.contentFor(view.footer.kind) : null;
   const Footer = footerLookup?.renderer.footer ?? null;
 
+  /** Log a broken view once per matcher and phase, then keep the panel alive. */
+  const reportViewError = (phase, error) => {
+    const key = `${resolved.matcherId}:${phase}`;
+    if (reportedViewErrors.current.has(key)) return;
+    reportedViewErrors.current.add(key);
+    console.error(
+      `[dsh-quick-switcher] matcher "${resolved.matcherId}" failed during ${phase}`,
+      error,
+    );
+  };
+
   // Commands ask the controller which mode the panel shows; the shell is the
   // only place that knows what the current query resolved to.
   React.useEffect(() => {
@@ -168,9 +180,14 @@ export function SwitcherShell({
 
   // A module that cannot answer synchronously returns empty rows plus a `load`
   // to run after render. The module dedupes by query, so a render caused by an
-  // unrelated store change costs nothing.
+  // unrelated store change costs nothing. A throwing load is contained here so
+  // one broken module cannot take the open panel down.
   React.useEffect(() => {
-    view.load?.();
+    try {
+      view.load?.();
+    } catch (error) {
+      reportViewError("load", error);
+    }
   }, [view]);
 
   React.useEffect(() => {
@@ -313,8 +330,14 @@ export function SwitcherShell({
     if (contentShown) {
       // The module owns the detail's letters; the shell only respects the
       // handled flag and never moves the hidden list's caret underneath it.
-      const handled = typeof view.keydown === "function" ? view.keydown(event, panel) : false;
-      if (handled === true) event.preventDefault();
+      let handled = false;
+      try {
+        handled =
+          typeof view.keydown === "function" ? view.keydown(event, panel) === true : false;
+      } catch (error) {
+        reportViewError("keydown", error);
+      }
+      if (handled) event.preventDefault();
       return;
     }
     if (key === "ArrowDown" || key === "ArrowUp") {

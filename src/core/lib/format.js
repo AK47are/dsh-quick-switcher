@@ -1,4 +1,4 @@
-/* Value normalization and time formatting shared by the panel and the routes. */
+/* Value normalization and time formatting shared by the panel and the modules. */
 
 /** Normalize an updatedAt value that may be milliseconds or an ISO string. */
 export function toMillis(value) {

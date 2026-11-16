@@ -1,12 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  ASK_PATH,
-  FORK_PATH,
   canFork,
   createAskStore,
 } from "../src/modules/ask/logic.js";
-import { UNLOADED_MESSAGE } from "../src/modules/ask/shared.js";
+import { ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "../src/modules/ask/shared.js";
 
 const t = (key) => key;
 

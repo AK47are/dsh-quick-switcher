@@ -82,8 +82,8 @@ function writeTimes(target, times) {
  *
  * The store is immutable from the caller's view: `getSnapshot` returns the
  * current map and `record` replaces it, so a consumer that reads once (the
- * panel at mount) never sees a map mutate under it. Storage failures are
- * swallowed on purpose: sorting can always fall back to `updatedAt`, and a
+ * presenter at each render) never sees a map mutate under it. Storage failures
+ * are swallowed on purpose: sorting can always fall back to `updatedAt`, and a
  * read-only browser profile must not break session switching.
  */
 export function createAccessStore(storage) {
@@ -111,12 +111,4 @@ export function createAccessStore(storage) {
       return times;
     },
   };
-}
-
-let singleton = null;
-
-/** Lazily share one map between the recorder and the panel. */
-export function getAccessStore() {
-  if (singleton === null) singleton = createAccessStore();
-  return singleton;
 }

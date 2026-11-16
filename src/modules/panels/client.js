@@ -19,7 +19,7 @@ export default defineModule("panels", (api) => {
     try {
       registrations = api.services.slots.entriesOfSlot(PANEL_SLOT) ?? [];
     } catch {
-      // An unreadable slot only costs the panels route; every other module
+      // An unreadable slot only costs the panels mode; every other module
       // must keep working, so this stays a silent empty list.
       registrations = [];
     }

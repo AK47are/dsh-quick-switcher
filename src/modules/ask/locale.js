@@ -42,6 +42,7 @@ export const locale = {
     "usageInput": "输入",
     "usageOutput": "输出",
     "askTitle": "侧问",
+    "askDescription": "就当前会话问一个不进入主对话的侧问。",
   },
   en: {
     "placeholderAsk": "Type a question, press Enter",
@@ -84,6 +85,7 @@ export const locale = {
     "usageInput": "input",
     "usageOutput": "output",
     "askTitle": "Side questions",
+    "askDescription": "Ask a question about this session without entering the main conversation.",
   },
 };
 

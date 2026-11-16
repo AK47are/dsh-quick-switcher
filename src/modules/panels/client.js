@@ -106,6 +106,8 @@ export default defineModule("panels", (api) => {
     apiVersion: 1,
     order: 40,
     labelKey: "panelsTitle",
+    descriptionKey: "panelsDescription",
+    entry: { seed: "#" },
     locale,
     mount(panel) {
       const unsubscribe = store.subscribe(() => panel.notify());

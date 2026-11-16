@@ -35,6 +35,10 @@ export default defineModule("sessions", (api) => {
     apiVersion: 1,
     order: 10,
     labelKey: "sessionsTitle",
+    descriptionKey: "sessionsDescription",
+    // The empty seed is the default list; the entry exists so the general open
+    // command can be configured to land here from another mode.
+    entry: { seed: "", labelKey: "sessionsEntryTitle" },
     locale,
     settings: {
       labelKey: "sessionsTitle",

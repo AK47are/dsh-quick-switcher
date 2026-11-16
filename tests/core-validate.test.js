@@ -23,12 +23,54 @@ test("a bare spec gets the defaults the registry relies on", () => {
   assert.equal(spec.apiVersion, 1);
   assert.equal(spec.order, 100);
   assert.equal(spec.labelKey, undefined);
+  assert.equal(spec.descriptionKey, undefined);
+  assert.deepEqual(spec.dependencies, []);
+  assert.equal(spec.entry, null);
   assert.equal(spec.locale, null);
   assert.equal(spec.settings, null);
   assert.deepEqual(spec.commands, []);
   assert.deepEqual(spec.slots, []);
   assert.equal(spec.views, null);
   assert.equal(spec.mount, undefined);
+});
+
+test("the entry declaration validates its seed, mode, aliases and defaults", () => {
+  const spec = validateSpec("alpha", {
+    entry: { seed: "!", aliases: ["历史"], defaults: {} },
+  });
+  assert.deepEqual(spec.entry, {
+    seed: "!",
+    mode: undefined,
+    labelKey: undefined,
+    aliases: ["历史"],
+    defaults: {},
+  });
+  assert.equal(validateSpec("alpha", { entry: { seed: "" } }).entry.seed, "");
+  assert.throws(() => validateSpec("alpha", { entry: null }), /entry must be an object/);
+  assert.throws(() => validateSpec("alpha", { entry: {} }), /seed/);
+  assert.throws(() => validateSpec("alpha", { entry: { seed: "!", mode: "Bad" } }), /entry.mode/);
+  assert.throws(() => validateSpec("alpha", { entry: { seed: "!", aliases: [1] } }), /aliases/);
+  assert.throws(() => validateSpec("alpha", { entry: { seed: "!", defaults: [] } }), /defaults/);
+});
+
+test("dependencies are unique module ids and cannot name the module itself", () => {
+  assert.deepEqual(validateSpec("alpha", {}).dependencies, []);
+  assert.deepEqual(validateSpec("alpha", { dependencies: ["sessions"] }).dependencies, ["sessions"]);
+  // An unknown id stays allowed: the dependency may arrive with a plugin installed later.
+  assert.deepEqual(validateSpec("alpha", { dependencies: ["later"] }).dependencies, ["later"]);
+  assert.throws(() => validateSpec("alpha", { dependencies: "sessions" }), /array/);
+  assert.throws(() => validateSpec("alpha", { dependencies: ["Bad"] }), /invalid/);
+  assert.throws(() => validateSpec("alpha", { dependencies: ["alpha"] }), /itself/);
+  assert.throws(() => validateSpec("alpha", { dependencies: ["x", "x"] }), /declared twice/);
+});
+
+test("a module description is a non-empty optional string", () => {
+  assert.equal(validateSpec("alpha", {}).descriptionKey, undefined);
+  assert.equal(
+    validateSpec("alpha", { descriptionKey: "alpha.description" }).descriptionKey,
+    "alpha.description",
+  );
+  assert.throws(() => validateSpec("alpha", { descriptionKey: "" }), /descriptionKey/);
 });
 
 test("the api version and the numeric metadata are checked", () => {

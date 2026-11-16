@@ -21,6 +21,8 @@ export default defineModule("ask", (api) => {
     apiVersion: 1,
     order: 70,
     labelKey: "askTitle",
+    descriptionKey: "askDescription",
+    entry: { seed: "?" },
     locale,
     settings: {
       labelKey: "askTitle",

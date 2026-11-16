@@ -145,12 +145,35 @@ export function prefixMatcher(prefix, options) {
  * @property {number} [apiVersion]
  * @property {number} [order]
  * @property {string} [labelKey]
+ * @property {string} [descriptionKey] one line shown under the module switch
+ * @property {string[]} [dependencies] module ids whose data this module reads
  * @property {Record<string, Record<string, string>>} [locale]
+ * @property {ModuleEntry} [entry] declares how a direct-open command reaches this mode
  * @property {ModuleSettingsDecl} [settings]
  * @property {ModuleCommand[]} [commands]
  * @property {ModuleSlot[]} [slots]
  * @property {Record<string, ModuleViewRenderer>} [views]
  * @property {(panel: PanelContext) => ModuleMount} [mount]
+ */
+
+/**
+ * How the core opens this module's mode directly.
+ *
+ * The seed is typed into the panel input, so it must resolve back to this
+ * module's matcher when every module is mounted. `mode` names the matcher the
+ * command compares against to decide whether the panel already shows this
+ * mode; it defaults to the module id. The core registers one DSH command per
+ * entry with the id `quickSwitcher.mode.<module id>`, a label prefixed with the
+ * plugin name, aliases from the module id and both language titles, and no
+ * default key unless the entry declares `defaults`. A module without an entry
+ * gets no direct-open command and is not offered as the default open mode.
+ *
+ * @typedef {object} ModuleEntry
+ * @property {string} seed query pre-filled when the command opens the panel
+ * @property {string} [mode] matcher id to compare against the open panel
+ * @property {string} [labelKey] mode name shown in the command label and default-mode options
+ * @property {string[]} [aliases] extra search words for the shortcut editor
+ * @property {Record<string, object>} [defaults] key specs keyed by `runtime:platform`
  */
 
 /**

@@ -34,6 +34,8 @@ export const locale = {
     "settingsPendingOrderLeastRecent": "最久未访问优先",
     "settingsPendingOrderMostRecent": "最近访问优先",
     "sessionsTitle": "会话",
+    "sessionsEntryTitle": "会话列表",
+    "sessionsDescription": "默认会话列表；关闭后工作区列表变空，访问时间停止记录。",
   },
   en: {
     "placeholder": "Search by title, workspace, path, or session ID",
@@ -68,6 +70,8 @@ export const locale = {
     "settingsPendingOrderLeastRecent": "Least recently visited first",
     "settingsPendingOrderMostRecent": "Most recently visited first",
     "sessionsTitle": "Sessions",
+    "sessionsEntryTitle": "Session list",
+    "sessionsDescription": "The default session list; turning it off empties the workspace list and stops access time tracking.",
   },
 };
 

@@ -12,6 +12,7 @@ export const locale = {
     "hintOpen": "打开",
     "countPanels": "{count} 个主面板",
     "panelsTitle": "主面板",
+    "panelsDescription": "跳到插件、自动化任务这类主面板。",
   },
   en: {
     "placeholderPanels": "Search by panel name or id",
@@ -24,6 +25,7 @@ export const locale = {
     "hintOpen": "open",
     "countPanels": "{count} panels",
     "panelsTitle": "Panels",
+    "panelsDescription": "Jump to full-page panels such as Plugins and Automations.",
   },
 };
 

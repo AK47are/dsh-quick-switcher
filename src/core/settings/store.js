@@ -10,6 +10,16 @@
 
 const STORAGE_KEY = "dsh.quick-switcher.v1";
 
+/**
+ * Core-owned preferences live under a key no module can occupy. Module ids
+ * start with a lowercase letter, so the double underscore stays reserved and a
+ * module named "core" or "switches" cannot collide with this subtree.
+ */
+const CORE_KEY = "__core";
+const DEFAULT_MODE_KEY = "defaultMode";
+const SWITCHES_KEY = "switches";
+const EXPANDED_KEY = "expanded";
+
 /** Flat preference names from 0.8.0 and the paths they moved to. */
 const LEGACY_PATHS = {
   includeAttachments: ["ask", "includeAttachments"],
@@ -170,6 +180,75 @@ export function createSettingsStore({ storage, eventTarget = globalThis } = {}) 
   }
 
   /**
+   * Whether a module participates in the panel. A missing value means on, so a
+   * fresh install and a newly registered module both start enabled; an explicit
+   * false survives a temporary unregister because the document is not keyed by
+   * the live registry.
+   */
+  function moduleSwitch(moduleId) {
+    return readPath(document, [CORE_KEY, SWITCHES_KEY, moduleId]) !== false;
+  }
+
+  function setModuleSwitch(moduleId, shouldEnable) {
+    if (typeof moduleId !== "string" || moduleId === "") {
+      throw new TypeError("dsh-quick-switcher: setModuleSwitch needs a module id");
+    }
+    if (typeof shouldEnable !== "boolean") {
+      throw new TypeError("dsh-quick-switcher: setModuleSwitch needs a boolean");
+    }
+    if (moduleSwitch(moduleId) === shouldEnable) return;
+    document = clone(document);
+    writePath(document, [CORE_KEY, SWITCHES_KEY, moduleId], shouldEnable);
+    persist(document);
+    emit();
+  }
+
+  /**
+   * The mode the general open command enters when no explicit seed is given.
+   * Null means the user never chose, so the panel falls back to the first
+   * registered entry instead of the core hard-coding a module id.
+   */
+  function defaultMode() {
+    const value = readPath(document, [CORE_KEY, DEFAULT_MODE_KEY]);
+    return typeof value === "string" && value !== "" ? value : null;
+  }
+
+  function setDefaultMode(moduleId) {
+    if (typeof moduleId !== "string" || moduleId === "") {
+      throw new TypeError("dsh-quick-switcher: setDefaultMode needs a module id");
+    }
+    if (defaultMode() === moduleId) return;
+    document = clone(document);
+    writePath(document, [CORE_KEY, DEFAULT_MODE_KEY], moduleId);
+    persist(document);
+    emit();
+  }
+
+  /**
+   * Whether a settings section is open. Missing means open, so the first visit
+   * shows every section and a user who never touched a disclosure keeps the
+   * full page. The state is stored with the rest of the preferences so it
+   * survives navigation, a reload and another tab.
+   */
+  function isSectionExpanded(sectionId) {
+    return readPath(document, [CORE_KEY, EXPANDED_KEY, sectionId]) !== false;
+  }
+
+  function setSectionExpanded(sectionId, isExpanded) {
+    if (typeof sectionId !== "string" || sectionId === "") {
+      throw new TypeError("dsh-quick-switcher: setSectionExpanded needs a section id");
+    }
+    if (typeof isExpanded !== "boolean") {
+      throw new TypeError("dsh-quick-switcher: setSectionExpanded needs a boolean");
+    }
+    if (isSectionExpanded(sectionId) === isExpanded) return;
+    document = clone(document);
+    writePath(document, [CORE_KEY, EXPANDED_KEY, sectionId], isExpanded);
+    persist(document);
+    emit();
+  }
+
+  /**
    * Register one module's settings and return the disposer that removes the
    * declaration. Stored values survive a dispose so a temporary unregister
    * does not throw away a user's choice.
@@ -234,9 +313,15 @@ export function createSettingsStore({ storage, eventTarget = globalThis } = {}) 
     fieldOf,
     get: valueOf,
     subscribe,
+    moduleSwitch,
+    setModuleSwitch,
+    defaultMode,
+    setDefaultMode,
+    isSectionExpanded,
+    setSectionExpanded,
     dispose,
     document: () => clone(document),
   };
 }
 
-export { STORAGE_KEY };
+export { CORE_KEY, STORAGE_KEY };

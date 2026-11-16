@@ -46,6 +46,8 @@ function wrapError(error, id, phase) {
  * @param {(name: string) => unknown} [deps.get]
  * @param {object} [deps.panel] the panel controller API
  * @param {(callback: () => unknown, label?: string) => () => void} [deps.effect]
+ * @param {(moduleId: string) => boolean} [deps.isModuleEnabled] switch state read at registration
+ * @param {(language: string, moduleId: string, key: string) => string|undefined} [deps.findLabel] title in one language, used for command aliases
  * @param {{ error: Function, warn: Function }} [deps.log]
  */
 export function createRegistry(deps = {}) {
@@ -66,6 +68,8 @@ export function createRegistry(deps = {}) {
       const dispose = callback();
       return typeof dispose === "function" ? dispose : () => {};
     });
+  const isModuleEnabled = deps.isModuleEnabled ?? (() => true);
+  const findLabel = deps.findLabel ?? (() => undefined);
 
   /** Insertion-ordered records; iteration order is fixed by id lookup. */
   const records = new Map();
@@ -98,8 +102,15 @@ export function createRegistry(deps = {}) {
 
   function checkViewKinds(id, spec) {
     if (spec.views === null) return;
+    // A switched-off module keeps its view kinds reserved: another module must
+    // not take a kind that would collide the moment the switch is turned back on.
+    const taken = new Set(views.keys());
+    for (const record of records.values()) {
+      if (record.spec.views === null) continue;
+      for (const kind of Object.keys(record.spec.views)) taken.add(kind);
+    }
     for (const kind of Object.keys(spec.views)) {
-      if (views.has(kind)) {
+      if (taken.has(kind)) {
         throw new Error(
           `dsh-quick-switcher: module "${id}" declares view kind "${kind}", which is already registered`,
         );
@@ -108,11 +119,110 @@ export function createRegistry(deps = {}) {
   }
 
   /**
+   * The command generated from a module entry.
+   *
+   * The command is an ordinary DSH app command: it appears in the shortcut
+   * editor and in the command list, and its resolve uses the mode the open
+   * panel publishes to decide between opening, switching and closing. `mode`
+   * names the matcher id rather than the module id because an external module
+   * may own several matchers.
+   */
+  function entryCommandOf(record) {
+    const entry = record.spec.entry;
+    if (entry === null) return null;
+    if (panel === null || typeof panel.open !== "function" || typeof panel.getState !== "function") {
+      return null;
+    }
+    const keys = [entry.labelKey, record.spec.labelKey].filter(
+      (key) => typeof key === "string" && key !== "",
+    );
+    const titleOf = () => {
+      for (const key of keys) {
+        const text = t(record.id, key);
+        if (typeof text === "string" && text !== "") return text;
+      }
+      return record.id;
+    };
+    const aliases = new Set([record.id, ...entry.aliases]);
+    for (const key of keys) {
+      for (const language of ["zh", "en"]) {
+        const text = findLabel(language, record.id, key);
+        if (typeof text === "string" && text !== "") aliases.add(text);
+      }
+    }
+    const mode = entry.mode ?? record.id;
+    return {
+      id: `quickSwitcher.mode.${record.id}`,
+      label: () => t(null, "modeCommandLabel", { title: titleOf() }),
+      aliases: [...aliases].filter((alias) => typeof alias === "string" && alias !== ""),
+      defaults: entry.defaults,
+      regions: ["page", "editable", "terminal"],
+      modals: ["other"],
+      resolve: () => {
+        let state = null;
+        try {
+          state = panel.getState();
+        } catch {
+          state = null;
+        }
+        if (state?.open === true && state.mode === mode) {
+          return { status: "handled", run: () => panel.close() };
+        }
+        return { status: "handled", run: () => panel.open({ seed: entry.seed }) };
+      },
+    };
+  }
+
+  /**
+   * Apply the contributions that stop while a module is switched off.
+   *
+   * Commands, slots and content views are runtime contributions: a switched-off
+   * module must not answer a shortcut, observe a slot or replace a view. Locale
+   * and settings declarations are kept, because the settings page still needs
+   * the module title, description and switches to offer turning it back on.
+   * A failure halfway through rolls the partial contributions back and leaves
+   * the record disabled, so a broken module cannot take the panel down.
+   */
+  function applyRuntime(record) {
+    const disposers = [];
+    const keep = (dispose) => {
+      if (typeof dispose === "function") disposers.push(once(dispose, log));
+    };
+    try {
+      const list = [...record.spec.commands];
+      const generated = entryCommandOf(record);
+      if (generated !== null) list.push(generated);
+      if (list.length > 0) keep(commands.add(record.id, list));
+      if (record.spec.slots.length > 0) keep(slots.add(record.id, record.spec.slots));
+      if (record.spec.views !== null) {
+        for (const [kind, renderer] of Object.entries(record.spec.views)) {
+          views.set(kind, { moduleId: record.id, renderer });
+          keep(() => {
+            if (views.get(kind)?.moduleId === record.id) views.delete(kind);
+          });
+        }
+      }
+    } catch (error) {
+      for (const dispose of [...disposers].reverse()) dispose();
+      throw error;
+    }
+    record.runtime = disposers;
+  }
+
+  function removeRuntime(record) {
+    for (const dispose of [...record.runtime].reverse()) dispose();
+    record.runtime = [];
+    record.matcherIds = [];
+  }
+
+  /**
    * Register one module definition and return its disposer.
    *
-   * Static contributions are applied in order and rolled back when any of them
-   * throws, so a failed registration never leaves a half-registered module in
-   * the panel or the settings page.
+   * Declarations and runtime contributions are applied in order and rolled
+   * back when any of them throws, so a failed registration never leaves a
+   * half-registered module in the panel or the settings page. A module stored as
+   * switched off applies only its declarations; its commands, slots and views
+   * appear the moment it is switched on.
    */
   function register(definition) {
     if (disposed) {
@@ -128,10 +238,10 @@ export function createRegistry(deps = {}) {
       throw new Error(`dsh-quick-switcher: module "${id}" is already registered`);
     }
 
-    const disposers = [];
+    const kept = [];
     const keep = (disposer) => {
       const wrapped = once(disposer, log);
-      disposers.push(wrapped);
+      kept.push(wrapped);
       return wrapped;
     };
     const scope = settings.scope(id);
@@ -156,7 +266,7 @@ export function createRegistry(deps = {}) {
     try {
       raw = definition.setup(api);
     } catch (error) {
-      for (const disposer of [...disposers].reverse()) disposer();
+      for (const disposer of [...kept].reverse()) disposer();
       throw wrapError(error, id, "setup");
     }
 
@@ -165,23 +275,8 @@ export function createRegistry(deps = {}) {
       spec = validateSpec(id, raw);
       checkViewKinds(id, spec);
     } catch (error) {
-      for (const disposer of [...disposers].reverse()) disposer();
+      for (const disposer of [...kept].reverse()) disposer();
       throw error;
-    }
-
-    try {
-      if (spec.locale !== null) keep(locale.add(id, spec.locale));
-      if (spec.settings !== null) keep(settings.declare(id, spec.settings));
-      if (spec.commands.length > 0) keep(commands.add(id, spec.commands));
-      if (spec.slots.length > 0) keep(slots.add(id, spec.slots));
-      if (spec.views !== null) {
-        for (const [kind, renderer] of Object.entries(spec.views)) {
-          views.set(kind, { moduleId: id, renderer });
-        }
-      }
-    } catch (error) {
-      for (const disposer of [...disposers].reverse()) disposer();
-      throw wrapError(error, id, "registration");
     }
 
     const record = {
@@ -189,18 +284,29 @@ export function createRegistry(deps = {}) {
       order: spec.order,
       spec,
       sequence: sequence++,
-      disposers,
+      runtime: [],
+      isEnabled: false,
       matcherIds: [],
     };
+
+    try {
+      if (spec.locale !== null) keep(locale.add(id, spec.locale));
+      if (spec.settings !== null) keep(settings.declare(id, spec.settings));
+      record.isEnabled = isModuleEnabled(id) !== false;
+      if (record.isEnabled) applyRuntime(record);
+    } catch (error) {
+      removeRuntime(record);
+      for (const disposer of [...kept].reverse()) disposer();
+      throw wrapError(error, id, "registration");
+    }
+
     records.set(id, record);
 
     const dispose = () => {
       if (records.get(id) !== record) return;
       records.delete(id);
-      for (const [kind, entry] of views) {
-        if (entry.moduleId === id) views.delete(kind);
-      }
-      for (const disposer of [...disposers].reverse()) disposer();
+      removeRuntime(record);
+      for (const disposer of [...kept].reverse()) disposer();
       notify();
     };
     record.dispose = dispose;
@@ -208,10 +314,54 @@ export function createRegistry(deps = {}) {
     return dispose;
   }
 
+  /**
+   * Switch one module on or off while the plugin runs.
+   *
+   * Returns false when the module is unknown or its contributions failed to
+   * apply; the caller keeps the stored switch at its previous value in that
+   * case. Mounted surfaces follow through the registry listener: a disabled
+   * module is disposed and a re-enabled one is mounted on the next sync.
+   */
+  function setEnabled(id, shouldEnable) {
+    const record = records.get(id);
+    if (record === undefined) return false;
+    const next = shouldEnable === true;
+    if (record.isEnabled === next) return true;
+    if (next) {
+      try {
+        record.isEnabled = true;
+        applyRuntime(record);
+      } catch (error) {
+        record.isEnabled = false;
+        removeRuntime(record);
+        log.error(`[dsh-quick-switcher] module "${id}" failed to enable`, error);
+        notify();
+        return false;
+      }
+    } else {
+      removeRuntime(record);
+      record.isEnabled = false;
+    }
+    notify();
+    return true;
+  }
+
   function modules() {
     return sortedRecords().map((record) => ({
       id: record.id,
       order: record.order,
+      isEnabled: record.isEnabled,
+      labelKey: record.spec.labelKey,
+      descriptionKey: record.spec.descriptionKey,
+      dependencies: [...record.spec.dependencies],
+      entry:
+        record.spec.entry === null
+          ? null
+          : {
+              ...record.spec.entry,
+              aliases: [...record.spec.entry.aliases],
+              defaults: { ...record.spec.entry.defaults },
+            },
       spec: record.spec,
       matcherIds: [...record.matcherIds],
     }));
@@ -235,6 +385,7 @@ export function createRegistry(deps = {}) {
     return sortedRecords().map((record) => ({
       id: record.id,
       order: record.order,
+      isEnabled: record.isEnabled,
       matchers: [...record.matcherIds],
     }));
   }
@@ -298,6 +449,7 @@ export function createRegistry(deps = {}) {
       const seen = new Set();
       let declaration = 0;
       for (const record of sortedRecords()) {
+        if (record.isEnabled !== true) continue;
         const entry = mounted.get(record.id);
         if (entry === undefined || entry.surface === null) continue;
         for (const matcher of entry.surface.matchers) {
@@ -332,12 +484,13 @@ export function createRegistry(deps = {}) {
     function sync() {
       if (closed) return;
       for (const [id, entry] of mounted) {
-        if (records.get(id) !== entry.record) {
+        if (records.get(id) !== entry.record || entry.record.isEnabled !== true) {
           disposeEntry(entry);
           mounted.delete(id);
         }
       }
       for (const record of sortedRecords()) {
+        if (record.isEnabled !== true) continue;
         if (mounted.has(record.id)) continue;
         const entry = { record, surface: null, matchers: [] };
         mounted.set(record.id, entry);
@@ -401,6 +554,7 @@ export function createRegistry(deps = {}) {
     function providers() {
       const next = [];
       for (const record of sortedRecords()) {
+        if (record.isEnabled !== true) continue;
         const entry = mounted.get(record.id);
         if (entry === undefined || entry.surface === null) continue;
         for (const Component of entry.surface.providers) {
@@ -462,6 +616,8 @@ export function createRegistry(deps = {}) {
   return {
     apiVersion: API_VERSION,
     register,
+    setEnabled,
+    isEnabled: (id) => records.get(id)?.isEnabled === true,
     mount,
     subscribe,
     modules,

@@ -2,7 +2,6 @@
 
 export const locale = {
   zh: {
-    "historyCommandLabel": "输入历史",
     "placeholderHistory": "搜索已发送的提示词与回答",
     "searchAriaHistory": "搜索输入历史",
     "listLabelHistory": "输入历史",
@@ -21,9 +20,9 @@ export const locale = {
     "hintFill": "填入",
     "countHistory": "{count} 条输入",
     "historyTitle": "历史",
+    "historyDescription": "把当前会话已发送的提示词与回答填回输入框。",
   },
   en: {
-    "historyCommandLabel": "Input history",
     "placeholderHistory": "Search sent prompts and answers",
     "searchAriaHistory": "Search input history",
     "listLabelHistory": "Input history",
@@ -42,6 +41,7 @@ export const locale = {
     "hintFill": "fill",
     "countHistory": "{count} inputs",
     "historyTitle": "History",
+    "historyDescription": "Refill the composer with prompts and answers already sent in this session.",
   },
 };
 

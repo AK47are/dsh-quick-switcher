@@ -53,6 +53,9 @@ export function validateSpec(moduleId, spec) {
   }
 
   const labelKey = optionalString(moduleId, spec.labelKey, "labelKey");
+  const descriptionKey = optionalString(moduleId, spec.descriptionKey, "descriptionKey");
+  const dependencies = validateDependencies(moduleId, spec.dependencies);
+  const entry = spec.entry === undefined ? null : validateEntry(moduleId, spec.entry);
   const locale = validateLocale(moduleId, spec.locale);
   const settings =
     spec.settings === undefined ? null : validateSettings(moduleId, spec.settings);
@@ -69,6 +72,9 @@ export function validateSpec(moduleId, spec) {
     apiVersion,
     order,
     labelKey,
+    descriptionKey,
+    dependencies,
+    entry,
     locale,
     settings,
     commands,
@@ -76,6 +82,49 @@ export function validateSpec(moduleId, spec) {
     views,
     mount: spec.mount,
   };
+}
+
+/**
+ * A module names the modules whose data it reads so the settings page can warn
+ * when one of them is switched off. Unknown ids are allowed: the dependency may
+ * belong to a plugin that is installed later, and a missing module is not a
+ * registration error.
+ */
+function validateDependencies(moduleId, dependencies) {
+  if (dependencies === undefined) return [];
+  if (!Array.isArray(dependencies)) fail(moduleId, "dependencies must be an array");
+  const seen = new Set();
+  return dependencies.map((id, index) => {
+    if (typeof id !== "string" || !ID_PATTERN.test(id)) {
+      fail(moduleId, `dependency ${index} id ${JSON.stringify(id)} is invalid`);
+    }
+    if (id === moduleId) fail(moduleId, "a module cannot depend on itself");
+    if (seen.has(id)) fail(moduleId, `dependency "${id}" is declared twice`);
+    seen.add(id);
+    return id;
+  });
+}
+
+/**
+ * Validate the direct-open declaration that turns into a generated command.
+ * The seed may be empty because the default session list is reached by an empty
+ * query; every other seed is a query prefix the matcher owns.
+ */
+function validateEntry(moduleId, entry) {
+  if (!isPlainObject(entry)) fail(moduleId, "entry must be an object");
+  if (typeof entry.seed !== "string") fail(moduleId, "entry.seed must be a string");
+  const mode = optionalString(moduleId, entry.mode, "entry.mode");
+  if (mode !== undefined && !ID_PATTERN.test(mode)) {
+    fail(moduleId, `entry.mode ${JSON.stringify(mode)} is invalid`);
+  }
+  const labelKey = optionalString(moduleId, entry.labelKey, "entry.labelKey");
+  const aliases = entry.aliases ?? [];
+  if (!Array.isArray(aliases) || aliases.some((alias) => typeof alias !== "string")) {
+    fail(moduleId, "entry.aliases must be a string array");
+  }
+  const defaults = entry.defaults ?? {};
+  if (!isPlainObject(defaults)) fail(moduleId, "entry.defaults must be an object");
+  return { seed: entry.seed, mode, labelKey, aliases, defaults };
 }
 
 function validateLocale(moduleId, locale) {

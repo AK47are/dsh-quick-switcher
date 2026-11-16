@@ -69,6 +69,8 @@ export default defineModule("files", (api) => {
     apiVersion: 1,
     order: 50,
     labelKey: "filesTitle",
+    descriptionKey: "filesDescription",
+    entry: { seed: "@" },
     locale,
     mount(panel) {
       /** Settled queries, keyed by session and filter text. */

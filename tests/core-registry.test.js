@@ -18,7 +18,7 @@ class MemoryStorage {
   }
 }
 
-function createHarness() {
+function createHarness(overrides = {}) {
   const calls = { locale: [], commands: [], slots: [], errors: [] };
   const settings = createSettingsStore({ storage: new MemoryStorage(), eventTarget: null });
   const deps = {
@@ -57,6 +57,7 @@ function createHarness() {
       warn() {},
       error: (...args) => calls.errors.push(args),
     },
+    ...overrides,
   };
   return { registry: createRegistry(deps), deps, calls, settings };
 }
@@ -515,4 +516,194 @@ test("disposeAll cleans every module and closes the registry", () => {
   registry.disposeAll();
   assert.equal(cleaned, 1);
   assert.throws(() => registry.register(defineModule("beta", () => ({}))), /disposed/);
+});
+
+/** A panel controller fake that records the seeds it opens and the closes. */
+function createPanelFake() {
+  const calls = { opened: [], closed: 0 };
+  let state = { open: false, mode: null };
+  return {
+    calls,
+    panel: {
+      getState: () => state,
+      open: (options) => {
+        calls.opened.push(options?.seed);
+        state = { open: true, mode: null };
+      },
+      close: () => {
+        calls.closed += 1;
+        state = { open: false, mode: null };
+      },
+      isOpen: () => state.open,
+      toggle() {},
+      subscribe: () => () => {},
+      list: () => [],
+    },
+    setState(next) {
+      state = { ...state, ...next };
+    },
+  };
+}
+
+/** A registry harness whose command sink keeps the command objects. */
+function createEntryHarness(panel) {
+  const recorded = { commands: [], slots: [] };
+  const registry = createRegistry({
+    t: (moduleId, key, params) =>
+      params?.title !== undefined
+        ? `${key}:${params.title}`
+        : moduleId === null
+          ? `core:${key}`
+          : `${moduleId}:${key}`,
+    settings: {
+      declare: () => () => {},
+      scope: () => ({ get() {}, set() {}, subscribe: () => () => {} }),
+    },
+    locale: { add: () => () => {} },
+    commands: {
+      add: (moduleId, list) => {
+        recorded.commands.push({ moduleId, list });
+        return () => recorded.commands.push({ moduleId, removed: true });
+      },
+    },
+    slots: { add: () => () => {} },
+    panel,
+    findLabel: () => undefined,
+    effect: (callback) => {
+      const dispose = callback();
+      return typeof dispose === "function" ? dispose : () => {};
+    },
+    log: { info() {}, warn() {}, error() {} },
+  });
+  return { registry, recorded };
+}
+
+test("switching a module off stops its runtime contributions and keeps its declarations", () => {
+  const { registry, calls, settings } = createHarness();
+  let disposed = 0;
+  registry.register(
+    defineModule("alpha", () => ({
+      labelKey: "title",
+      locale: { en: { title: "A" } },
+      settings: {
+        labelKey: "alpha.settings",
+        groups: [{ fields: [{ id: "flag", type: "boolean", default: true }] }],
+      },
+      commands: [{ id: "alpha.run", label: () => "Run", resolve: () => ({ status: "handled" }) }],
+      slots: [{ name: "shell.overlay", id: "alpha", component: () => null }],
+      views: { alphaView: { content: () => null } },
+      mount: () => ({
+        matchers: [claims("alpha", "a")],
+        dispose: () => {
+          disposed += 1;
+        },
+      }),
+    })),
+  );
+  const mounted = registry.mount(panelOf());
+  assert.equal(mounted.resolve("a").matcherId, "alpha");
+  assert.ok(registry.viewsOf("alphaView"));
+  assert.equal(settings.groups().length, 1);
+
+  assert.equal(registry.setEnabled("alpha", false), true);
+  assert.equal(registry.modules()[0].isEnabled, false);
+  assert.equal(mounted.resolve("a").matcherId, null);
+  assert.equal(disposed, 1);
+  assert.equal(registry.viewsOf("alphaView"), null);
+  // The switch row needs the title, description and preferences while off.
+  assert.equal(settings.groups().length, 1);
+  assert.ok(calls.commands.includes("alpha:removed"));
+  assert.ok(calls.slots.includes("alpha:removed"));
+
+  assert.equal(registry.setEnabled("alpha", true), true);
+  assert.equal(registry.modules()[0].isEnabled, true);
+  assert.ok(registry.viewsOf("alphaView"));
+  assert.equal(mounted.resolve("a").matcherId, "alpha");
+  assert.equal(calls.commands.filter((id) => id === "alpha").length, 2);
+  mounted.dispose();
+});
+
+test("a module stored as switched off registers without runtime contributions", () => {
+  const { registry, calls, settings } = createHarness({
+    isModuleEnabled: (id) => id !== "alpha",
+  });
+  registry.register(
+    defineModule("alpha", () => ({
+      settings: {
+        labelKey: "alpha.settings",
+        groups: [{ fields: [{ id: "flag", type: "boolean", default: true }] }],
+      },
+      commands: [{ id: "alpha.run", label: () => "Run", resolve: () => ({ status: "handled" }) }],
+      slots: [{ name: "shell.overlay", id: "alpha", component: () => null }],
+      views: { alphaView: { content: () => null } },
+    })),
+  );
+  assert.equal(registry.modules()[0].isEnabled, false);
+  assert.equal(settings.groups().length, 1);
+  assert.deepEqual(calls.commands, []);
+  assert.deepEqual(calls.slots, []);
+  assert.equal(registry.viewsOf("alphaView"), null);
+
+  assert.equal(registry.setEnabled("alpha", true), true);
+  assert.ok(calls.commands.includes("alpha"));
+  assert.ok(calls.slots.includes("alpha"));
+  assert.ok(registry.viewsOf("alphaView"));
+  assert.equal(registry.setEnabled("missing", false), false);
+});
+
+test("a switched-off module keeps its view kind reserved", () => {
+  const { registry } = createHarness({ isModuleEnabled: (id) => id !== "alpha" });
+  registry.register(defineModule("alpha", () => ({ views: { shared: { content: () => null } } })));
+  assert.throws(
+    () =>
+      registry.register(
+        defineModule("beta", () => ({ views: { shared: { content: () => null } } })),
+      ),
+    /already registered/,
+  );
+});
+
+test("the generated entry command opens, switches and closes the panel", () => {
+  const fake = createPanelFake();
+  const { registry, recorded } = createEntryHarness(fake.panel);
+  registry.register(
+    defineModule("history", () => ({
+      labelKey: "title",
+      entry: { seed: "!", aliases: ["历史", "input history"] },
+      mount: () => ({ matchers: [claims("history", "!", 10)] }),
+    })),
+  );
+  const command = recorded.commands
+    .flatMap((entry) => entry.list)
+    .find((entry) => entry.id === "quickSwitcher.mode.history");
+  assert.ok(command);
+  assert.equal(command.label(), "modeCommandLabel:history:title");
+  assert.deepEqual(command.defaults, {});
+  assert.deepEqual(command.regions, ["page", "editable", "terminal"]);
+  assert.deepEqual(command.modals, ["other"]);
+  assert.ok(command.aliases.includes("history"));
+  assert.ok(command.aliases.includes("历史"));
+
+  assert.equal(command.resolve().status, "handled");
+  command.resolve().run();
+  assert.deepEqual(fake.calls.opened, ["!"]);
+
+  fake.setState({ open: true, mode: "files" });
+  command.resolve().run();
+  assert.deepEqual(fake.calls.opened, ["!", "!"]);
+
+  fake.setState({ open: true, mode: "history" });
+  command.resolve().run();
+  assert.equal(fake.calls.closed, 1);
+
+  assert.equal(registry.setEnabled("history", false), true);
+  assert.ok(recorded.commands.some((entry) => entry.moduleId === "history" && entry.removed));
+  assert.equal(registry.setEnabled("history", true), true);
+  const replayed = recorded.commands.filter(
+    (entry) =>
+      Array.isArray(entry.list) &&
+      entry.list.some((item) => item.id === "quickSwitcher.mode.history"),
+  );
+  assert.equal(replayed.length, 2);
+  registry.disposeAll();
 });

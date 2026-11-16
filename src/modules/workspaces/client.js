@@ -46,6 +46,11 @@ export default defineModule("workspaces", (api) => {
     apiVersion: 1,
     order: 20,
     labelKey: "workspacesTitle",
+    descriptionKey: "workspacesDescription",
+    // The workspace list renders rows the sessions module publishes, so its
+    // switch row warns when that module is off even though no import connects them.
+    dependencies: ["sessions"],
+    entry: { seed: "+" },
     locale,
     mount(panel) {
       // Enter remembers the exact workspace id, so two workspaces that share a

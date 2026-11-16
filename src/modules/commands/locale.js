@@ -15,6 +15,7 @@ export const locale = {
     "hintRunCommand": "运行",
     "countCommands": "{count} 条命令",
     "commandsTitle": "命令",
+    "commandsDescription": "搜索并运行应用命令，包含本插件的直达命令。",
   },
   en: {
     "placeholderCommands": "Search by command name or alias",
@@ -30,6 +31,7 @@ export const locale = {
     "hintRunCommand": "run",
     "countCommands": "{count} commands",
     "commandsTitle": "Commands",
+    "commandsDescription": "Search and run application commands, including this plugin's mode commands.",
   },
 };
 

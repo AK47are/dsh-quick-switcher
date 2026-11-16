@@ -9,6 +9,7 @@ import { createTranslator } from "../src/core/i18n.js";
 import { en as coreEn, zh as coreZh } from "../src/core/i18n-keys.js";
 import { createRegistry } from "../src/core/registry.js";
 import { createSettingsStore } from "../src/core/settings/store.js";
+import { buildSettingsModel } from "../src/core/settings/model.js";
 
 /**
  * Load the real client manifest with a React stub.
@@ -99,6 +100,8 @@ function createHarness() {
     services,
     get: () => undefined,
     panel: panelApi,
+    isModuleEnabled: () => true,
+    findLabel: (language, moduleId, key) => translator.findIn(language, moduleId, key),
     effect: (callback) => {
       const dispose = callback();
       return typeof dispose === "function" ? dispose : () => {};
@@ -106,7 +109,7 @@ function createHarness() {
     log: { info() {}, warn() {}, error() {} },
   });
 
-  return { registry, calls, settings, services };
+  return { registry, calls, settings, services, translator };
 }
 
 function panelOf(services) {
@@ -157,7 +160,40 @@ test("the real client manifest registers every module and its contributions", as
   const commands = harness.calls.commands.flatMap((entry) =>
     entry.list.map((command) => command.id),
   );
-  assert.deepEqual(commands, ["quickSwitcher.history"]);
+  assert.deepEqual(commands, [
+    "quickSwitcher.mode.sessions",
+    "quickSwitcher.mode.workspaces",
+    "quickSwitcher.mode.commands",
+    "quickSwitcher.mode.panels",
+    "quickSwitcher.mode.files",
+    "quickSwitcher.mode.history",
+    "quickSwitcher.mode.ask",
+  ]);
+
+  // Every built-in module is reachable directly. A new module that forgets its
+  // entry fails here instead of silently missing a shortcut.
+  assert.deepEqual(
+    harness.registry.modules().map((module) => [module.id, module.entry?.seed ?? null]),
+    [
+      ["sessions", ""],
+      ["workspaces", "+"],
+      ["commands", ">"],
+      ["panels", "#"],
+      ["files", "@"],
+      ["history", "!"],
+      ["ask", "?"],
+    ],
+  );
+  assert.deepEqual(
+    harness.registry
+      .modules()
+      .filter((module) => module.dependencies.length > 0)
+      .map((module) => [module.id, module.dependencies]),
+    [["workspaces", ["sessions"]]],
+  );
+  for (const module of harness.registry.modules()) {
+    assert.equal(typeof module.descriptionKey, "string", `description for ${module.id}`);
+  }
 
   const slots = harness.calls.slots.flatMap((entry) =>
     entry.list.map((slot) => slot.id),
@@ -178,11 +214,66 @@ test("the real client manifest registers every module and its contributions", as
   for (const [query, matcherId] of claims) {
     assert.equal(mounted.resolve(query).matcherId, matcherId, `query ${JSON.stringify(query)}`);
   }
+  for (const module of harness.registry.modules()) {
+    if (module.entry === null) continue;
+    const expected = module.entry.mode ?? module.id;
+    assert.equal(
+      mounted.resolve(module.entry.seed).matcherId,
+      expected,
+      `entry of ${module.id} reaches its own mode`,
+    );
+  }
+  const sessionsCommand = harness.calls.commands
+    .flatMap((entry) => entry.list)
+    .find((command) => command.id === "quickSwitcher.mode.sessions");
+  assert.ok(sessionsCommand.aliases.includes("会话列表"));
+  assert.ok(sessionsCommand.aliases.includes("Session list"));
   assert.equal(mounted.providers().length, 0);
   const ask = mounted.contentFor("ask");
   assert.equal(typeof ask.instance.store.find, "function");
   assert.equal(typeof ask.instance.ui.getSnapshot, "function");
   assert.equal(typeof ask.instance.actions.copy, "function");
+
+  const buildModel = () =>
+    buildSettingsModel({
+      registry: harness.registry,
+      settings: harness.settings,
+      t: (key, params) => harness.translator.t(null, key, params),
+      tModule: (moduleId, key, params) => harness.translator.t(moduleId, key, params),
+    });
+  const model = buildModel();
+  assert.equal(model.modules.length, 7);
+  assert.equal(model.general.defaultMode.value, "sessions");
+  assert.equal(model.general.defaultMode.options.length, 7);
+  assert.equal(model.general.defaultMode.warning, null);
+  assert.deepEqual(
+    model.groups.map((entry) => [entry.moduleId, entry.isEnabled]),
+    [
+      ["sessions", true],
+      ["ask", true],
+    ],
+  );
+  assert.deepEqual(
+    model.modules.find((module) => module.id === "workspaces").warnings,
+    [],
+  );
+
+  assert.equal(harness.registry.setEnabled("sessions", false), true);
+  const switchedOff = buildModel();
+  assert.equal(
+    switchedOff.modules.find((module) => module.id === "sessions").isEnabled,
+    false,
+  );
+  const workspaceWarnings = switchedOff.modules.find(
+    (module) => module.id === "workspaces",
+  ).warnings;
+  assert.equal(workspaceWarnings.length, 1);
+  assert.match(workspaceWarnings[0], /会话/u);
+  assert.equal(
+    switchedOff.general.defaultMode.warning,
+    harness.translator.t(null, "settingsDefaultModeOff"),
+  );
+  assert.equal(harness.registry.setEnabled("sessions", true), true);
 
   mounted.dispose();
   harness.registry.disposeAll();

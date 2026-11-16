@@ -19,6 +19,7 @@ export const locale = {
     "empty": "没有匹配的会话",
     "createFailed": "无法新建会话",
     "workspacesTitle": "工作区",
+    "workspacesDescription": "按工作区浏览会话或新建会话；数据来自会话模块。",
   },
   en: {
     "placeholderWorkspaces": "Search by workspace title or path",
@@ -38,6 +39,7 @@ export const locale = {
     "empty": "No matching sessions",
     "createFailed": "Could not create a session",
     "workspacesTitle": "Workspaces",
+    "workspacesDescription": "Browse sessions by workspace or start a new one; the data comes from the sessions module.",
   },
 };
 

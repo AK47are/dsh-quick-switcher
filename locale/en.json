@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Quick switcher",
-    "description": "A unified search surface that switches sessions, browses workspaces, runs application commands, refills the input from sent prompts and answers to the agent's questions, jumps to a main panel such as Plugins or Automation tasks, opens workspace files in the Sidebar from @, and answers a side question about the current session from ?. A side question carries the full tool activity and the step that is still running; images and files can be turned off in Settings. Opens with Ctrl+Shift+K by default; input history is unbound."
+    "description": "A unified search surface that switches sessions, browses workspaces, runs application commands, refills the input from sent prompts and answers to the agent's questions, jumps to a main panel such as Plugins or Automation tasks, opens workspace files in the Sidebar from @, and answers a side question about the current session from ?. Settings can switch modules on or off and choose the default open mode; every mode also has a direct command in Edit shortcuts, unbound by default. Opens with Ctrl+Shift+K by default, and a side question carries the full tool activity and the running step, with images and files configurable in Settings."
   }
 }

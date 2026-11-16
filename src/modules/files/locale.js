@@ -15,6 +15,7 @@ export const locale = {
     "hintFilesOpen": "打开或进入",
     "hintFilesPreview": "打开并查看预览",
     "filesTitle": "文件",
+    "filesDescription": "搜索当前会话工作目录的文件，并交给右侧栏预览。",
   },
   en: {
     "placeholderFiles": "Search files in this workspace",
@@ -30,6 +31,7 @@ export const locale = {
     "hintFilesOpen": "open or enter",
     "hintFilesPreview": "open and focus preview",
     "filesTitle": "Files",
+    "filesDescription": "Search files in the current session's working directory and preview them in the right sidebar.",
   },
 };
 

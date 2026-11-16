@@ -56,6 +56,17 @@ export function createSessionsPresenter({ api, shared, access, rowFor }) {
       shared.publish({ ...data, rowFor });
     }, [data, shared, rowFor]);
 
+    // Switching the sessions module off removes this slot, which unsubscribes
+    // the only publisher of `session-data`. Clear the last snapshot so the
+    // workspace module shows an empty list instead of rows that stopped
+    // updating; the same cleanup runs when the plugin unloads.
+    React.useEffect(
+      () => () => {
+        shared.publish(null);
+      },
+      [shared],
+    );
+
     return null;
   };
 }

@@ -67,5 +67,21 @@ export function createTranslator({ locale, dictionaries = {} } = {}) {
     };
   }
 
-  return { t, add, language };
+  /**
+   * Look one key up in a named language without switching the active one.
+   *
+   * The shortcut editor searches aliases literally, so a command generated from
+   * a module entry needs both the Chinese and the English title even though
+   * only one of them is on screen. Returns undefined for a missing key instead
+   * of the key itself, because an alias equal to a dictionary key would be
+   * noise in the editor.
+   */
+  function findIn(languageTag, moduleId, key) {
+    if (typeof languageTag !== "string" || languageTag === "") return undefined;
+    const text = moduleId === null ? undefined : lookup(modules.get(moduleId), languageTag, key);
+    if (text !== undefined) return text;
+    return lookup(dictionaries, languageTag, key);
+  }
+
+  return { t, add, language, findIn };
 }

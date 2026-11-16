@@ -1,6 +1,7 @@
-/* Settings section generated from module declarations. */
+/* Settings section generated from module declarations and switcher state. */
 
 import React from "react";
+import { buildSettingsModel } from "./model.js";
 
 const h = React.createElement;
 
@@ -8,42 +9,86 @@ const STYLE = `
 .dqs-settings-page {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .dqs-settings-heading {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-bottom: 8px;
+  gap: 2px;
+  padding-bottom: 4px;
 }
 .dqs-settings-title {
   margin: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 24px;
+  line-height: 22px;
 }
 .dqs-settings-description {
   margin: 0;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 17px;
 }
-.dqs-settings-module {
+.dqs-settings-sectionHeading {
+  margin: 0;
+}
+.dqs-settings-sectionButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 4px;
+  margin-left: -4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.dqs-settings-sectionButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.dqs-settings-sectionButton:focus-visible {
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+.dqs-settings-chevron {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 120ms ease;
+}
+.dqs-settings-chevronOpen {
+  transform: rotate(90deg);
+}
+.dqs-settings-summary {
+  margin-left: auto;
+  padding-left: 8px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dqs-settings-sectionBody {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-top: 8px;
+  gap: 2px;
+  padding-top: 2px;
 }
 .dqs-settings-moduleTitle {
   margin: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 22px;
+  line-height: 20px;
 }
 .dqs-settings-groupTitle {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   font-weight: 600;
@@ -54,32 +99,53 @@ const STYLE = `
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 16px 0;
+  gap: 16px;
+  padding: 10px 0;
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+.dqs-settings-rowStack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.dqs-settings-rowStack .dqs-settings-text {
+  padding-right: 0;
 }
 .dqs-settings-text {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  padding-right: 48px;
+  padding-right: 24px;
 }
 .dqs-settings-rowTitle {
   color: var(--dsw-alias-label-primary);
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 13px;
+  line-height: 19px;
 }
 .dqs-settings-rowDescription,
-.dqs-settings-rowHint {
+.dqs-settings-rowHint,
+.dqs-settings-warning {
   margin: 0;
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 17px;
 }
 .dqs-settings-rowHint {
   color: var(--dsw-alias-label-tertiary);
+}
+.dqs-settings-warning {
+  color: var(--dsw-alias-state-warning-primary, var(--dsw-alias-label-secondary));
+}
+.dqs-settings-tag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
 }
 .dqs-settings-switch {
   position: relative;
@@ -114,19 +180,60 @@ const STYLE = `
   outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
+.dqs-settings-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dqs-settings-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dqs-settings-pill:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+.dqs-settings-pill[data-selected="true"] {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+.dqs-settings-pill:focus-within {
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
+}
+.dqs-settings-pillInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .dqs-settings-choices {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .dqs-settings-choice {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 18px;
   cursor: pointer;
 }
 .dqs-settings-choice input {
@@ -137,7 +244,7 @@ const STYLE = `
 .dqs-settings-number {
   box-sizing: border-box;
   width: 96px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   background: var(--dsw-alias-bg-base);
@@ -146,7 +253,8 @@ const STYLE = `
 }
 @media (prefers-reduced-motion: reduce) {
   .dqs-settings-switch,
-  .dqs-settings-switch::after {
+  .dqs-settings-switch::after,
+  .dqs-settings-chevron {
     transition: none;
   }
 }
@@ -155,10 +263,11 @@ const STYLE = `
 /**
  * Build the settings section.
  *
- * The page owns no preference logic: it reads the declarations the registry
- * collected, renders one section per module with the generic controls, and
- * writes through the same settings store the modules read. A new module with
- * settings appears here without touching this file.
+ * The page owns no preference logic: it reads the model built from module
+ * declarations and the core switches, then writes through the same settings
+ * store the modules read. A module registered or switched off while the page is
+ * open re-renders through the registry subscription, and a switch recorded in
+ * another tab arrives through the store subscription.
  */
 export function createSettingsSection({ settings, registry, t, tModule }) {
   return function SettingsSection() {
@@ -167,7 +276,12 @@ export function createSettingsSection({ settings, registry, t, tModule }) {
       () => settings.subscribe(() => setRevision((value) => value + 1)),
       [],
     );
-    const modules = registry.settingsGroups();
+    React.useEffect(
+      () => registry.subscribe(() => setRevision((value) => value + 1)),
+      [registry],
+    );
+    const model = buildSettingsModel({ registry, settings, t, tModule });
+    const empty = model.modules.length === 0 && model.groups.length === 0;
     return h(
       "div",
       { className: "dqs-settings-page" },
@@ -178,30 +292,217 @@ export function createSettingsSection({ settings, registry, t, tModule }) {
         h("h2", { className: "dqs-settings-title" }, t("settingsTitle")),
         h("p", { className: "dqs-settings-description" }, t("settingsDescription")),
       ),
-      modules.length === 0
+      empty
         ? h("p", { className: "dqs-settings-description" }, t("settingsEmpty"))
-        : modules.map((entry) =>
-            h(ModuleBlock, {
-              key: entry.moduleId,
-              entry,
-              settings,
-              tModule,
-            }),
-          ),
+        : null,
+      model.modules.length === 0
+        ? null
+        : h(ModuleSwitches, { modules: model.modules, settings, t }),
+      model.general.defaultMode.options.length === 0
+        ? null
+        : h(DefaultMode, { general: model.general, settings, t }),
+      model.groups.map((entry) => h(ModuleBlock, { key: entry.moduleId, entry, settings, t, tModule })),
     );
   };
 }
 
-function ModuleBlock({ entry, settings, tModule }) {
-  const scope = settings.scope(entry.moduleId);
+/**
+ * A disclosure header shared by the module list, the general settings and each
+ * module's preferences. The open state lives in the settings store, so a
+ * section stays collapsed after leaving the page or reloading, and another tab
+ * sees the same layout.
+ */
+function SectionToggle({ id, title, summary, tag, settings, children }) {
+  const isOpen = settings.isSectionExpanded(id);
   return h(
     "section",
-    { className: "dqs-settings-module" },
+    { className: "dqs-settings-section" },
     h(
       "h3",
-      { className: "dqs-settings-moduleTitle" },
-      tModule(entry.moduleId, entry.settings.labelKey),
+      { className: "dqs-settings-sectionHeading" },
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dqs-settings-sectionButton",
+          "aria-expanded": isOpen,
+          onClick: () => settings.setSectionExpanded(id, !isOpen),
+        },
+        h(Chevron, { isOpen }),
+        h("span", { className: "dqs-settings-moduleTitle" }, title),
+        tag === null || tag === undefined
+          ? null
+          : h("span", { className: "dqs-settings-tag" }, tag),
+        summary === null || summary === undefined
+          ? null
+          : h("span", { className: "dqs-settings-summary" }, summary),
+      ),
     ),
+    isOpen
+      ? h(
+          "div",
+          { className: "dqs-settings-sectionBody" },
+          ...(Array.isArray(children) ? children : [children]),
+        )
+      : null,
+  );
+}
+
+function Chevron({ isOpen }) {
+  return h(
+    "svg",
+    {
+      className: isOpen
+        ? "dqs-settings-chevron dqs-settings-chevronOpen"
+        : "dqs-settings-chevron",
+      width: 12,
+      height: 12,
+      viewBox: "0 0 12 12",
+      "aria-hidden": "true",
+      focusable: "false",
+    },
+    h("path", {
+      d: "M4.5 2.5 L8 6 L4.5 9.5",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.5,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+    }),
+  );
+}
+
+function ModuleSwitches({ modules, settings, t }) {
+  const offCount = modules.filter((module) => !module.isEnabled).length;
+  const summary =
+    offCount === 0
+      ? t("settingsModulesCount", { count: modules.length })
+      : `${t("settingsModulesCount", { count: modules.length })} · ${t(
+          "settingsModulesOffCount",
+          { count: offCount },
+        )}`;
+  return h(
+    SectionToggle,
+    {
+      id: "modules",
+      title: t("settingsModulesTitle"),
+      summary,
+      settings,
+    },
+    h("p", { className: "dqs-settings-description" }, t("settingsModulesDescription")),
+    modules.map((module) => h(ModuleSwitchRow, { key: module.id, module, settings, t })),
+  );
+}
+
+function ModuleSwitchRow({ module, settings, t }) {
+  return h(
+    "div",
+    { className: "dqs-settings-row" },
+    h(
+      "div",
+      { className: "dqs-settings-text" },
+      h("div", { className: "dqs-settings-rowTitle" }, module.title),
+      h("p", { className: "dqs-settings-rowDescription" }, module.description),
+      module.warnings.map((warning, index) =>
+        h("p", { key: `warning-${index}`, className: "dqs-settings-warning" }, warning),
+      ),
+    ),
+    h("button", {
+      type: "button",
+      role: "switch",
+      "aria-checked": module.isEnabled,
+      "aria-label": module.title,
+      className: "dqs-settings-switch",
+      onClick: () => settings.setModuleSwitch(module.id, !module.isEnabled),
+    }),
+  );
+}
+
+function DefaultMode({ general, settings, t }) {
+  const { value, options, warning } = general.defaultMode;
+  const selectedOption = options.find((option) => option.value === value);
+  const summary =
+    selectedOption === undefined
+      ? warning === null
+        ? null
+        : t("settingsDefaultModeUnavailableShort")
+      : selectedOption.isEnabled
+        ? selectedOption.label
+        : t("settingsOptionOff", { label: selectedOption.label });
+  return h(
+    SectionToggle,
+    { id: "general", title: t("settingsGeneralTitle"), summary, settings },
+    h(
+      "div",
+      { className: "dqs-settings-row dqs-settings-rowStack" },
+      h(
+        "div",
+        { className: "dqs-settings-text" },
+        h("div", { className: "dqs-settings-rowTitle" }, t("settingsDefaultModeTitle")),
+        h(
+          "p",
+          { className: "dqs-settings-rowDescription" },
+          t("settingsDefaultModeDescription"),
+        ),
+        warning === null
+          ? null
+          : h("p", { className: "dqs-settings-warning" }, warning),
+      ),
+      h(
+        "div",
+        {
+          className: "dqs-settings-pills",
+          role: "radiogroup",
+          "aria-label": t("settingsDefaultModeTitle"),
+        },
+        options.map((option) => {
+          const selected = value === option.value;
+          return h(
+            "label",
+            {
+              key: option.value,
+              className: "dqs-settings-pill",
+              "data-selected": selected ? "true" : "false",
+              // The input is visually hidden, so this handler also covers a
+              // click on the pill text and pins the checked option.
+              onClick: () => settings.setDefaultMode(option.value),
+            },
+            h("input", {
+              type: "radio",
+              className: "dqs-settings-pillInput",
+              name: "dqs-settings-default-mode",
+              value: option.value,
+              checked: selected,
+              // Clicking the checked pill (the effective first entry while the
+              // preference is unset) has no change event, so the click pins
+              // the shown choice instead of leaving it implicit.
+              onClick: () => settings.setDefaultMode(option.value),
+              onChange: () => settings.setDefaultMode(option.value),
+            }),
+            h(
+              "span",
+              null,
+              option.isEnabled
+                ? option.label
+                : t("settingsOptionOff", { label: option.label }),
+            ),
+          );
+        }),
+      ),
+    ),
+  );
+}
+
+function ModuleBlock({ entry, settings, t, tModule }) {
+  const scope = settings.scope(entry.moduleId);
+  return h(
+    SectionToggle,
+    {
+      id: `module:${entry.moduleId}`,
+      title: tModule(entry.moduleId, entry.settings.labelKey),
+      tag: entry.isEnabled ? null : t("settingsModuleOff"),
+      settings,
+    },
     entry.settings.descriptionKey === undefined
       ? null
       : h(

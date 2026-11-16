@@ -148,6 +148,15 @@ export function SwitcherShell({
   const resolved = mounted.resolve(query);
   const view = resolved.view;
   const rows = view.rows;
+  // The default view is also the fallback when every matcher declined. Two
+  // cases deserve a specific sentence: no module is switched on at all, and
+  // the empty query reaches nothing because the default list is off.
+  let emptyText = view.emptyText;
+  if (resolved.matcherId === null) {
+    const enabledModules = registry.modules().filter((module) => module.isEnabled !== false);
+    if (enabledModules.length === 0) emptyText = t("panelAllModulesOff");
+    else if (query === "") emptyText = t("panelNoDefaultList");
+  }
   const contentShown = view.content !== null;
   const contentLookup = contentShown ? mounted.contentFor(view.content.kind) : null;
   const Content = contentLookup?.renderer.content ?? null;
@@ -381,8 +390,8 @@ export function SwitcherShell({
 
   const children = [];
   if (rows.length === 0) {
-    if (view.emptyText) {
-      children.push(h("div", { className: "dqs-empty", key: "empty" }, view.emptyText));
+    if (emptyText) {
+      children.push(h("div", { className: "dqs-empty", key: "empty" }, emptyText));
     }
   } else {
     for (let index = 0; index < rows.length; index += 1) {

@@ -238,3 +238,76 @@ test("groups report declarations in registration order with their labels", () =>
   assert.equal(groups[0].labelKey, "alpha.settings");
   assert.equal(store.fieldOf("alpha", "limit").path.join("."), "alpha.search.limit");
 });
+
+test("module switches default on, persist off and survive a reload", () => {
+  const storage = new MemoryStorage();
+  const store = createSettingsStore({ storage, eventTarget: null });
+  assert.equal(store.moduleSwitch("alpha"), true);
+  store.setModuleSwitch("alpha", false);
+  assert.equal(store.moduleSwitch("alpha"), false);
+  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_KEY)).__core, {
+    switches: { alpha: false },
+  });
+
+  const reloaded = createSettingsStore({ storage, eventTarget: null });
+  assert.equal(reloaded.moduleSwitch("alpha"), false);
+  assert.equal(reloaded.moduleSwitch("beta"), true);
+  reloaded.setModuleSwitch("alpha", true);
+  assert.equal(reloaded.moduleSwitch("alpha"), true);
+  assert.throws(() => reloaded.setModuleSwitch("", true), /module id/);
+  assert.throws(() => reloaded.setModuleSwitch("alpha", "yes"), /boolean/);
+});
+
+test("the default open mode is null until chosen and shares the core subtree", () => {
+  const storage = new MemoryStorage();
+  const store = createSettingsStore({ storage, eventTarget: null });
+  assert.equal(store.defaultMode(), null);
+  store.setDefaultMode("files");
+  assert.equal(store.defaultMode(), "files");
+  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_KEY)).__core, { defaultMode: "files" });
+  const reloaded = createSettingsStore({ storage, eventTarget: null });
+  assert.equal(reloaded.defaultMode(), "files");
+  assert.throws(() => reloaded.setDefaultMode(""), /module id/);
+});
+
+test("settings sections are expanded by default and remember a collapse", () => {
+  const storage = new MemoryStorage();
+  const store = createSettingsStore({ storage, eventTarget: null });
+  assert.equal(store.isSectionExpanded("modules"), true);
+  store.setSectionExpanded("modules", false);
+  assert.equal(store.isSectionExpanded("modules"), false);
+  assert.deepEqual(JSON.parse(storage.getItem(STORAGE_KEY)).__core, {
+    expanded: { modules: false },
+  });
+
+  const reloaded = createSettingsStore({ storage, eventTarget: null });
+  assert.equal(reloaded.isSectionExpanded("modules"), false);
+  assert.equal(reloaded.isSectionExpanded("general"), true);
+  assert.throws(() => reloaded.setSectionExpanded("", false), /section id/);
+  assert.throws(() => reloaded.setSectionExpanded("modules", "no"), /boolean/);
+});
+
+test("a storage event applies a switch and a default mode written by another tab", () => {
+  const storage = new MemoryStorage();
+  const target = new MemoryEventTarget();
+  const store = createSettingsStore({ storage, eventTarget: target });
+  let notified = 0;
+  store.subscribe(() => {
+    notified += 1;
+  });
+  storage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      __core: {
+        switches: { files: false },
+        defaultMode: "commands",
+        expanded: { modules: false },
+      },
+    }),
+  );
+  target.dispatch("storage", { key: STORAGE_KEY });
+  assert.equal(notified, 1);
+  assert.equal(store.moduleSwitch("files"), false);
+  assert.equal(store.defaultMode(), "commands");
+  assert.equal(store.isSectionExpanded("modules"), false);
+});

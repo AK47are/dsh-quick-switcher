@@ -99,6 +99,8 @@ export default defineModule("commands", (api) => {
     apiVersion: 1,
     order: 30,
     labelKey: "commandsTitle",
+    descriptionKey: "commandsDescription",
+    entry: { seed: ">" },
     locale,
     mount(panel) {
       // Recents change while the panel is closed, and the catalog snapshot may

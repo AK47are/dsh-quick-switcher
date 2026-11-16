@@ -14,6 +14,7 @@ import { createPanelController } from "./panel/controller.js";
 import { createOverlay } from "./panel/overlay.js";
 import { startPointerBaseline } from "./panel/pointer.js";
 import { createRegistry } from "./registry.js";
+import { createSettingsSection } from "./settings/page.js";
 import { createSettingsStore } from "./settings/store.js";
 
 export const NS = "dsh-quick-switcher";
@@ -176,6 +177,28 @@ export function createBody({ ctx, modules }) {
         inject: () => ({ registry, controller, t: tCore, services, get }),
       },
       Overlay,
+    ),
+  );
+
+  // The settings page is one section; modules add their groups to it through
+  // the same declaration the registry already collected.
+  const tModule = (moduleId, key, params) => translator.t(moduleId, key, params);
+  const SettingsSection = createSettingsSection({
+    settings,
+    registry,
+    t: tCore,
+    tModule,
+  });
+  ctx.slots.inject("settings.section", () =>
+    ctx.slots.register(
+      {
+        name: "settings.section",
+        id: NS,
+        order: 60,
+        label: () => tCore("settingsNav"),
+        locale: NS,
+      },
+      SettingsSection,
     ),
   );
 

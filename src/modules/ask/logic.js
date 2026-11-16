@@ -2,6 +2,7 @@
 
 import { relativeTime } from "../../core/lib/format.js";
 import { buildPendingContext } from "./context.js";
+import { LOWEST_EFFORT } from "./models.js";
 import { ASK_EVENTS, ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
 
 /** Re-render rate while an answer streams; text is kept on every chunk. */
@@ -121,10 +122,12 @@ async function refusalOf(response) {
  * write it can cause is the single user message a fork inserts into the new
  * session.
  *
- * `request`, `now`, `translate`, and `includeAttachments` are injectable so
- * tests can drive the stream with a fake clock and a fake transport. The module
- * passes a reader for the settings scope, so a preference change applies to the
- * next question instead of to the copy of the store imported here. The default
+ * `request`, `now`, `translate`, `includeAttachments`, and `selection` are
+ * injectable so tests can drive the stream with a fake clock and a fake
+ * transport. The module passes readers for the settings scope, so a preference
+ * change applies to the next question instead of to the copy of the store
+ * imported here; `selection` reports the pinned provider, model, and reasoning
+ * effort, with empty strings meaning "follow the session". The default
  * `translate` is the identity, which keeps the store usable outside the panel.
  */
 export function createAskStore({
@@ -132,6 +135,7 @@ export function createAskStore({
   now = Date.now,
   translate = (key) => key,
   includeAttachments = () => true,
+  selection = () => ({}),
 } = {}) {
   /** Newest first. Every mutation replaces the record object, never edits it. */
   const items = [];
@@ -228,6 +232,29 @@ export function createAskStore({
     }
   }
 
+  /**
+   * Read the pinned model choice once, at question time.
+   *
+   * A provider without a model is not a choice: it means the host follows the
+   * session, so both strings are cleared together. The effort always has a
+   * value, because the lowest level is the setting's default and the host needs
+   * the intent even when no model is pinned.
+   */
+  function captureChoice() {
+    let raw;
+    try {
+      raw = selection();
+    } catch (error) {
+      console.error("[dsh-quick-switcher] side question selection reader failed", error);
+      raw = undefined;
+    }
+    const provider = typeof raw?.provider === "string" ? raw.provider.trim() : "";
+    const model = typeof raw?.model === "string" ? raw.model.trim() : "";
+    const effort = typeof raw?.effort === "string" && raw.effort !== "" ? raw.effort : LOWEST_EFFORT;
+    if (provider === "" || model === "") return { provider: "", model: "", effort };
+    return { provider, model, effort };
+  }
+
   function createRecord(sessionId, question, context) {
     return {
       id: `ask-${nextId++}`,
@@ -236,10 +263,16 @@ export function createAskStore({
       answer: "",
       context: typeof context?.text === "string" ? context.text : "",
       contextLabel: typeof context?.label === "string" ? context.label : "",
-      // The preference is captured at question time, so regenerate replays the
+      // Preferences are captured at question time, so regenerate replays the
       // same snapshot policy instead of silently adopting a newer setting.
       includeAttachments: includeAttachments() !== false,
+      choice: captureChoice(),
+      // What the host actually ran: the session's model when none is pinned, and
+      // the floored effort. The start event fills these in.
+      provider: "",
       model: "",
+      effort: "",
+      effortName: "",
       usage: null,
       status: "running",
       error: null,
@@ -271,6 +304,11 @@ export function createAskStore({
       question: record.question,
       includeAttachments: record.includeAttachments,
     };
+    if (record.choice.provider !== "") {
+      body.provider = record.choice.provider;
+      body.model = record.choice.model;
+    }
+    if (record.choice.effort !== "") body.reasoningEffort = record.choice.effort;
     if (record.context !== "") body.context = record.context;
     try {
       const response = await request(ASK_PATH, body, controller.signal);
@@ -328,9 +366,17 @@ export function createAskStore({
     if (current.status !== "running") return;
     switch (payload.type) {
       case ASK_EVENTS.start:
+        // The host echoes what it actually ran: the session model when no model
+        // is pinned, and the level it floored the request to. Every field is
+        // rewritten, so a regenerate that lands on a model without reasoning
+        // clears the previous badge instead of keeping a stale one.
         patch(id, {
           atSeq: typeof payload.atSeq === "number" ? payload.atSeq : null,
+          provider: typeof payload.provider === "string" ? payload.provider : "",
           model: typeof payload.model === "string" ? payload.model : "",
+          effort: typeof payload.reasoningEffort === "string" ? payload.reasoningEffort : "",
+          effortName:
+            typeof payload.reasoningEffortName === "string" ? payload.reasoningEffortName : "",
         });
         return;
       case ASK_EVENTS.delta:
@@ -429,6 +475,12 @@ export function createAskStore({
       usage: null,
       error: null,
       status: "running",
+      // The pinned choice is replayed as-is; the effective model and level are
+      // cleared until the host's start event names what this attempt ran.
+      provider: "",
+      model: "",
+      effort: "",
+      effortName: "",
     });
     if (next === null) return false;
     start(next);

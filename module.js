@@ -276,6 +276,14 @@ export function prefixMatcher(prefix, options) {
  */
 
 /**
+ * A custom field renders its own control.
+ *
+ * `render` is called with `{ field, value, set, t }` and returns a React
+ * element. It may return another component's element, which lets the control use
+ * hooks and read data the declaration closure captured (a remote catalog, for
+ * example). The store does not validate a custom value, so the control and every
+ * reader must handle a missing or stale value themselves.
+ *
  * @typedef {object} SettingsField
  * @property {string} id unique inside the module
  * @property {"boolean"|"choice"|"number"|"custom"} type
@@ -287,7 +295,7 @@ export function prefixMatcher(prefix, options) {
  * @property {number} [max]
  * @property {number} [step]
  * @property {Array<{ value: string|number, labelKey: string }>} [options]
- * @property {Function} [render]
+ * @property {(props: { field: SettingsField, value: unknown, set: (value: unknown) => void, t: (key: string, params?: object) => string }) => unknown} [render]
  */
 
 /**

@@ -25,6 +25,7 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { defineHostModule } from "../../core/host/module.js";
+import { LOWEST_EFFORT, effortNameOf, floorEffort, lowestEffort } from "./models.js";
 import { ASK_EVENTS, ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
 
 const MAX_BODY_BYTES = 262144;
@@ -105,9 +106,12 @@ export default defineHostModule("ask", (api) => {
   };
 });
 /**
- * Stream one side answer. The conversation snapshot and the model selection
- * are read synchronously before the first await, so later main-turn events
- * cannot leak into a question the user asked earlier.
+ * Stream one side answer.
+ *
+ * The model choice is resolved first because a pinned model can fail loudly and
+ * its context window sizes the snapshot budget. The snapshot itself is then read
+ * in one synchronous step, so no main-turn event can land between the history
+ * and the live block.
  */
 async function askRoute(ctx, running, live, request, response) {
   if (request.method !== "POST") {
@@ -135,6 +139,10 @@ async function askRoute(ctx, running, live, request, response) {
   // gets the complete snapshot it used to get, and only an explicit false
   // downgrades them to placeholders.
   const includeAttachments = body.includeAttachments !== false;
+  const pinned = readPinnedModel(body);
+  if (pinned.ok !== true) {
+    return sendJson(response, 400, { error: "provider and model must be supplied together" });
+  }
   const agent = ctx.agents.get(sessionId);
   if (agent === undefined) {
     return sendJson(response, 404, { error: "session is not live" });
@@ -144,14 +152,27 @@ async function askRoute(ctx, running, live, request, response) {
       error: "a side question is already running in this session",
     });
   }
-  const selection = currentSelection(agent);
-  if (selection === undefined) {
-    return sendJson(response, 409, { error: "no model is selected for this session" });
+  const choice = await resolveCallChoice(ctx, {
+    pinned: pinned.choice,
+    agent,
+    effort: readRequestedEffort(body.reasoningEffort),
+  });
+  if (choice.ok !== true) {
+    return sendJson(response, choice.status, { error: choice.error });
   }
+  // The lookup above awaits, so the one-question rule is re-checked here and the
+  // slot is claimed in the same synchronous step as the check.
+  if (running.has(sessionId)) {
+    return sendJson(response, 409, {
+      error: "a side question is already running in this session",
+    });
+  }
+  const selection = choice.selection;
   let snapshot;
   try {
     snapshot = snapshotContext(agent, question, context, live.snapshot(sessionId), {
       includeAttachments,
+      contextWindow: selection.contextWindow,
     });
   } catch (error) {
     return sendJson(response, snapshotStatusOf(error), { error: messageOf(error) });
@@ -197,6 +218,12 @@ async function askRoute(ctx, running, live, request, response) {
     atSeq: snapshot.atSeq,
     provider: selection.provider,
     model: selection.model,
+    ...(selection.reasoningEffort === undefined
+      ? {}
+      : {
+          reasoningEffort: selection.reasoningEffort,
+          reasoningEffortName: selection.reasoningEffortName,
+        }),
   });
   try {
     /** @type {Record<string, unknown>} */
@@ -210,6 +237,7 @@ async function askRoute(ctx, running, live, request, response) {
     if (selection.reasoningEffort !== undefined) {
       options.reasoningEffort = selection.reasoningEffort;
     }
+    let failure = null;
     for await (const chunk of ctx.llm.stream(options)) {
       if (chunk === null || typeof chunk !== "object") continue;
       if (chunk.type === "text-delta" && typeof chunk.text === "string" && chunk.text !== "") {
@@ -218,9 +246,15 @@ async function askRoute(ctx, running, live, request, response) {
         send({ type: ASK_EVENTS.usage, usage: chunk.usage });
       } else if (chunk.type === "finish") {
         send({ type: ASK_EVENTS.finish, reason: chunk.reason });
+        // The llm service never throws for an adapter failure; it yields one
+        // terminal finish chunk instead. Reporting it as `done` would turn a
+        // refused call into a finished answer with no content.
+        const text = finishFailureOf(chunk.reason);
+        if (text !== null) failure = text;
       }
     }
-    send({ type: ASK_EVENTS.done });
+    if (failure === null) send({ type: ASK_EVENTS.done });
+    else send({ type: ASK_EVENTS.error, message: failure });
   } catch (error) {
     if (!controller.signal.aborted) send({ type: ASK_EVENTS.error, message: messageOf(error) });
   } finally {
@@ -348,6 +382,36 @@ function normalizeContext(value) {
 }
 
 /**
+ * Read the pinned model from the request body.
+ *
+ * An absent pair means "follow the session"; half a pair is a client bug, since
+ * a model id alone cannot be routed. Ids are bounded so a malformed body cannot
+ * carry an unbounded string into the provider call.
+ */
+function readPinnedModel(body) {
+  const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+  const model = typeof body.model === "string" ? body.model.trim() : "";
+  if (provider === "" && model === "") return { ok: true, choice: null };
+  if (provider === "" || model === "") return { ok: false };
+  if (provider.length > 200 || model.length > 200) return { ok: false };
+  return { ok: true, choice: { provider, model } };
+}
+
+/**
+ * Read the requested effort id.
+ *
+ * A missing or empty field means the lowest supported level, which is the
+ * setting's default: an older client that does not send the field still gets
+ * the fast side question instead of the session's own level.
+ */
+function readRequestedEffort(value) {
+  if (typeof value !== "string") return LOWEST_EFFORT;
+  const text = value.trim();
+  if (text === "" || text === LOWEST_EFFORT) return LOWEST_EFFORT;
+  return text.slice(0, 64);
+}
+
+/**
  * Snapshot the model-visible history, append the running turn's live state,
  * and finish with the side question.
  *
@@ -366,7 +430,13 @@ function snapshotContext(agent, question, context, liveState, options) {
   });
   const live = renderLiveBlock(liveState, isRunning, projection.pendingToolCalls);
   projection.messages.push(createUserMessage(composeSideQuestion(question, context, live)));
-  trimToBudget(projection.messages, session.requestContext()?.contextWindow);
+  // The pinned model's window wins: a smaller model must still fit the snapshot,
+  // and a larger one should not lose history the session window would not have
+  // kept anyway.
+  trimToBudget(
+    projection.messages,
+    options.contextWindow ?? session.requestContext()?.contextWindow,
+  );
   return { atSeq, messages: projection.messages };
 }
 
@@ -865,6 +935,99 @@ function currentSelection(agent) {
       ? { reasoningEffort }
       : {}),
   };
+}
+
+/**
+ * Resolve which model answers and at which level.
+ *
+ * A pinned model is resolved strictly: when it is gone the question fails with
+ * an actionable 409 instead of quietly running on the session model, because the
+ * user picked it on purpose and a silent swap would answer at a speed or price
+ * they did not ask for. The session model is resolved leniently: a failed lookup
+ * only drops the level, and the provider call reports its own failure.
+ *
+ * The effort is always resolved against the model actually used: `"lowest"`
+ * becomes the model's lowest level, and a level the model does not offer floors
+ * to the nearest supported level below it. A model without reasoning gets no
+ * effort at all, because passing one would make the call fail.
+ */
+async function resolveCallChoice(ctx, { pinned, agent, effort }) {
+  let provider;
+  let model;
+  if (pinned !== null) {
+    provider = pinned.provider;
+    model = pinned.model;
+  } else {
+    const session = currentSelection(agent);
+    if (session === undefined) {
+      return { ok: false, status: 409, error: "no model is selected for this session" };
+    }
+    provider = session.provider;
+    model = session.model;
+  }
+
+  let info = null;
+  let failure = null;
+  if (typeof ctx.llm?.resolveModelInfo === "function") {
+    try {
+      info = await ctx.llm.resolveModelInfo(provider, model);
+    } catch (error) {
+      failure = error;
+    }
+  }
+  if (pinned !== null && failure !== null) {
+    const isGone = failure?.code === "NO_ADAPTER" || failure?.code === "UNKNOWN_MODEL";
+    if (isGone) {
+      return {
+        ok: false,
+        status: 409,
+        error: `the side question model "${provider}/${model}" is not available; choose another model in the side question settings`,
+      };
+    }
+    return {
+      ok: false,
+      status: 500,
+      error: `could not resolve the side question model "${provider}/${model}": ${messageOf(failure)}`,
+    };
+  }
+
+  const efforts = info?.reasoning?.efforts ?? [];
+  let reasoningEffort;
+  let reasoningEffortName = "";
+  if (efforts.length > 0) {
+    const id = effort === LOWEST_EFFORT ? lowestEffort(efforts) : floorEffort(efforts, effort);
+    if (id !== null) {
+      reasoningEffort = id;
+      reasoningEffortName = effortNameOf(efforts, id);
+    }
+  }
+  return {
+    ok: true,
+    selection: {
+      provider,
+      model,
+      contextWindow: info?.context?.contextWindow,
+      ...(reasoningEffort === undefined ? {} : { reasoningEffort, reasoningEffortName }),
+    },
+  };
+}
+
+/**
+ * Read the failure out of one terminal finish chunk.
+ *
+ * `ctx.llm.stream` reports an adapter refusal as a finish chunk whose reason is
+ * `{ kind: "error", failure: { code, message } }` instead of throwing, so the
+ * route must translate it or the record would end as a successful empty answer.
+ */
+function finishFailureOf(reason) {
+  if (reason === null || typeof reason !== "object") return null;
+  if (reason.kind !== "error") return null;
+  const failure = reason.failure;
+  const code = typeof failure?.code === "string" ? failure.code : "";
+  const detail = typeof failure?.message === "string" ? failure.message : "";
+  if (code === "" && detail === "") return "the model call failed";
+  if (detail === "") return `the model call failed (${code})`;
+  return code === "" ? detail : `${detail} (${code})`;
 }
 
 /** Build the minimal user message shape the session accepts. */

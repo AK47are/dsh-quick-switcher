@@ -4,15 +4,31 @@ import { defineModule, prefixMatcher } from "../../core/module.js";
 import { AskDetail, AskFooter } from "./detail.js";
 import { locale } from "./locale.js";
 import { createAskActions, createAskStore, createAskUi, createAskView } from "./logic.js";
+import { LOWEST_EFFORT, readChoice } from "./models.js";
+import { createAskSettings } from "./settings.js";
 
 export default defineModule("ask", (api) => {
   // The store outlives every panel mount, so a running answer keeps streaming
   // while the panel is closed and its records survive reopen. The attachment
-  // preference is read through the settings scope at request time: a change
-  // applies to the next question without rebuilding the store.
+  // and model preferences are read through the settings scope at request time:
+  // a change applies to the next question without rebuilding the store.
+  const askSettings = createAskSettings(api);
   const store = createAskStore({
     translate: (key, params) => api.t(key, params),
     includeAttachments: () => api.settings.get("includeAttachments"),
+    // A null model means "follow the session"; the host resolves that, so the
+    // client only sends a model when one is pinned. The effort is always sent:
+    // its lowest default is the point of the setting, and the host floors it on
+    // a model that offers fewer levels.
+    selection: () => {
+      const model = readChoice(api.settings.get("model"));
+      const effort = api.settings.get("reasoningEffort");
+      return {
+        provider: model === null ? "" : model.provider,
+        model: model === null ? "" : model.model,
+        effort: typeof effort === "string" && effort !== "" ? effort : LOWEST_EFFORT,
+      };
+    },
   });
 
   api.effect(() => () => store.dispose(), "ask: store");
@@ -29,6 +45,8 @@ export default defineModule("ask", (api) => {
       groups: [
         {
           fields: [
+            askSettings.modelField,
+            askSettings.effortField,
             {
               id: "includeAttachments",
               type: "boolean",

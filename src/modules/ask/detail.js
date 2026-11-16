@@ -128,6 +128,15 @@ export function AskDetail({ descriptor, instance, t }) {
   if (record.model !== "") {
     badges.push(h("span", { key: "model", className: "dqs-ask-meta" }, record.model));
   }
+  // The host names the level it actually ran, so a floored request shows the
+  // level behind the answer instead of the one the user picked.
+  if (typeof record.effort === "string" && record.effort !== "") {
+    const effort =
+      typeof record.effortName === "string" && record.effortName !== ""
+        ? record.effortName
+        : record.effort;
+    badges.push(h("span", { key: "effort", className: "dqs-ask-meta" }, effort));
+  }
   if (usage !== "") {
     badges.push(h("span", { key: "usage", className: "dqs-ask-meta" }, usage));
   }

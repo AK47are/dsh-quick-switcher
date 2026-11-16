@@ -218,6 +218,103 @@ test("the settings reader is consulted at question time, not at import time", as
   assert.equal(seen[2].body.includeAttachments, true);
 });
 
+test("the pinned model and level are captured and replayed on regenerate", async () => {
+  let choice = { provider: "q", model: "claude", effort: "low" };
+  const seen = [];
+  const store = createAskStore({
+    request: async (path, body) => {
+      seen.push({ path, body });
+      return responseOf(
+        heldStream(
+          sse(
+            {
+              type: "start",
+              atSeq: 0,
+              provider: "q",
+              model: "claude",
+              reasoningEffort: "low",
+              reasoningEffortName: "Low",
+            },
+            { type: "done" },
+          ),
+        ),
+      );
+    },
+    now: () => 0,
+    selection: () => choice,
+  });
+
+  const record = store.ask("s1", "q");
+  await flush();
+  assert.equal(seen[0].body.provider, "q");
+  assert.equal(seen[0].body.model, "claude");
+  assert.equal(seen[0].body.reasoningEffort, "low");
+  assert.deepEqual(store.find(record.id).choice, { provider: "q", model: "claude", effort: "low" });
+  // The effective values come from the host, not from the captured choice.
+  assert.equal(store.find(record.id).provider, "q");
+  assert.equal(store.find(record.id).effortName, "Low");
+
+  // Changing the setting later must not rewrite an existing record.
+  choice = { provider: "", model: "", effort: "max" };
+  assert.equal(store.regenerate("s1", record.id), true);
+  await flush();
+  assert.equal(seen[1].body.provider, "q");
+  assert.equal(seen[1].body.model, "claude");
+  assert.equal(seen[1].body.reasoningEffort, "low");
+
+  // The next question follows the new setting: no pinned model, only a level.
+  assert.notEqual(store.ask("s1", "q2"), null);
+  await flush();
+  assert.equal("provider" in seen[2].body, false);
+  assert.equal("model" in seen[2].body, false);
+  assert.equal(seen[2].body.reasoningEffort, "max");
+});
+
+test("the start event names the model and level the host actually used", async () => {
+  const streams = [
+    heldStream(
+      sse(
+        {
+          type: "start",
+          atSeq: 0,
+          provider: "q",
+          model: "claude",
+          reasoningEffort: "off",
+          reasoningEffortName: "Off",
+        },
+        { type: "done" },
+      ),
+    ),
+    heldStream(
+      sse(
+        { type: "start", atSeq: 0, provider: "deepseek", model: "flash" },
+        { type: "done" },
+      ),
+    ),
+  ];
+  const store = createAskStore({
+    request: async () => responseOf(streams.shift()),
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q");
+  await flush();
+  const first = store.find(record.id);
+  assert.equal(first.provider, "q");
+  assert.equal(first.model, "claude");
+  assert.equal(first.effort, "off");
+  assert.equal(first.effortName, "Off");
+
+  // A second start without a level must clear the old badge, not keep it.
+  assert.equal(store.regenerate("s1", record.id), true);
+  await flush();
+  const second = store.find(record.id);
+  assert.equal(second.provider, "deepseek");
+  assert.equal(second.model, "flash");
+  assert.equal(second.effort, "");
+  assert.equal(second.effortName, "");
+});
+
 test("streamed text is kept on every chunk while notifications are throttled", async () => {
   let clock = 0;
   const store = createAskStore({

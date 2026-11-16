@@ -149,6 +149,64 @@ function captureLlm(requests, chunks = []) {
   };
 }
 
+/** An Error shaped like the llm service's coded rejections. */
+function llmError(code, message = code) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+/**
+ * An llm double with a per-model lookup and a scripted stream.
+ *
+ * `models` maps "provider/model" to resolved model info or to an Error the
+ * lookup rejects with; a model missing from the map resolves as plain text with
+ * a large window, which keeps older tests working unchanged.
+ */
+function modelLlm({ models = {}, chunks = [] } = {}) {
+  const requests = [];
+  return {
+    requests,
+    resolveModelInfo(provider, model) {
+      const entry = models[`${provider}/${model}`];
+      if (entry instanceof Error) return Promise.reject(entry);
+      if (entry === undefined) {
+        return Promise.resolve({
+          provider,
+          id: model,
+          name: model,
+          context: { contextWindow: 100000 },
+        });
+      }
+      return Promise.resolve(entry);
+    },
+    stream(options) {
+      requests.push(options);
+      return (async function* stream() {
+        for (const chunk of chunks) yield chunk;
+      })();
+    },
+  };
+}
+
+/** The session model as a reasoning model offering off, low, and high. */
+function deepseekInfo() {
+  return {
+    provider: "p",
+    id: "m",
+    name: "M",
+    context: { contextWindow: 100000 },
+    reasoning: {
+      efforts: [
+        { id: "off", name: "Off" },
+        { id: "low", name: "Low" },
+        { id: "high", name: "High" },
+      ],
+      defaultEffort: "high",
+    },
+  };
+}
+
 function liveFrame(agent, emit, frame) {
   emit("agent/assistant-stream", { agent, frame });
 }
@@ -515,6 +573,162 @@ test("a snapshot that cannot fit the window answers 413", async () => {
   });
   assert.equal(response.status, 413);
   assert.match(JSON.parse(response.chunks.join("")).error, /too large/u);
+});
+
+test("a pinned model runs with the lowest supported level", async () => {
+  const llm = modelLlm({
+    models: {
+      "q/claude": {
+        provider: "q",
+        id: "claude",
+        name: "Claude",
+        context: { contextWindow: 100000 },
+        reasoning: {
+          efforts: [
+            { id: "high", name: "High" },
+            { id: "max", name: "Max" },
+          ],
+        },
+      },
+    },
+    chunks: [{ type: "text-delta", text: "ok" }, { type: "finish", reason: { kind: "stop" } }],
+  });
+  const { ctx, routes } = createContext({ agent: createAgent(), llm });
+  apply(ctx);
+
+  const response = await post(routes.get("/dsh-quick-switcher/ask"), {
+    sessionId: "s1",
+    question: "why?",
+    provider: "q",
+    model: "claude",
+    reasoningEffort: "lowest",
+  });
+  assert.equal(response.status, 200);
+  assert.equal(llm.requests[0].provider, "q");
+  assert.equal(llm.requests[0].model, "claude");
+  assert.equal(llm.requests[0].reasoningEffort, "high");
+
+  const start = eventsOf(response)[0];
+  assert.equal(start.provider, "q");
+  assert.equal(start.model, "claude");
+  assert.equal(start.reasoningEffort, "high");
+  assert.equal(start.reasoningEffortName, "High");
+});
+
+test("the session level is not reused and an unsupported level floors down", async () => {
+  const llm = modelLlm({
+    models: { "p/m": deepseekInfo() },
+    chunks: [{ type: "finish", reason: { kind: "stop" } }],
+  });
+  const agent = createAgent();
+  // The session thinks at high; the side question still takes the lowest level.
+  agent.model = { current: () => ({ provider: "p", model: "m", reasoningEffort: "high" }) };
+  const { ctx, routes } = createContext({ agent, llm });
+  apply(ctx);
+  const handler = routes.get("/dsh-quick-switcher/ask");
+
+  await post(handler, { sessionId: "s1", question: "one" });
+  assert.equal(llm.requests[0].reasoningEffort, "off");
+
+  await post(handler, { sessionId: "s1", question: "two", reasoningEffort: "xhigh" });
+  assert.equal(llm.requests[1].reasoningEffort, "high");
+
+  const start = eventsOf(await post(handler, { sessionId: "s1", question: "three" }))[0];
+  assert.equal(start.reasoningEffort, "off");
+  assert.equal(start.reasoningEffortName, "Off");
+});
+
+test("a model without reasoning gets no level", async () => {
+  const llm = modelLlm({
+    models: { "q/text": { provider: "q", id: "text", context: { contextWindow: 100000 } } },
+    chunks: [{ type: "finish", reason: { kind: "stop" } }],
+  });
+  const { ctx, routes } = createContext({ agent: createAgent(), llm });
+  apply(ctx);
+
+  const response = await post(routes.get("/dsh-quick-switcher/ask"), {
+    sessionId: "s1",
+    question: "why?",
+    provider: "q",
+    model: "text",
+    reasoningEffort: "low",
+  });
+  assert.equal(response.status, 200);
+  assert.equal("reasoningEffort" in llm.requests[0], false);
+  assert.equal("reasoningEffort" in eventsOf(response)[0], false);
+});
+
+test("a pinned model that is gone answers 409 and never calls the provider", async () => {
+  const llm = modelLlm({ models: { "q/gone": llmError("NO_ADAPTER", "no adapter") } });
+  const { ctx, routes } = createContext({ agent: createAgent(), llm });
+  apply(ctx);
+
+  const response = await post(routes.get("/dsh-quick-switcher/ask"), {
+    sessionId: "s1",
+    question: "why?",
+    provider: "q",
+    model: "gone",
+  });
+  assert.equal(response.status, 409);
+  const error = JSON.parse(response.chunks.join("")).error;
+  assert.match(error, /"q\/gone" is not available/u);
+  assert.match(error, /side question settings/u);
+  assert.equal(llm.requests.length, 0);
+});
+
+test("half a pinned model is a client error", async () => {
+  const llm = modelLlm({});
+  const { ctx, routes } = createContext({ agent: createAgent(), llm });
+  apply(ctx);
+  const handler = routes.get("/dsh-quick-switcher/ask");
+
+  const providerOnly = await post(handler, { sessionId: "s1", question: "why?", provider: "q" });
+  assert.equal(providerOnly.status, 400);
+  const modelOnly = await post(handler, { sessionId: "s1", question: "why?", model: "m" });
+  assert.equal(modelOnly.status, 400);
+  assert.equal(llm.requests.length, 0);
+});
+
+test("an adapter failure becomes an error event, not an empty answer", async () => {
+  const llm = modelLlm({
+    models: { "p/m": deepseekInfo() },
+    chunks: [
+      {
+        type: "finish",
+        reason: { kind: "error", failure: { code: "UNSUPPORTED_REASONING_EFFORT" } },
+      },
+    ],
+  });
+  const { ctx, routes } = createContext({ agent: createAgent(), llm });
+  apply(ctx);
+
+  const response = await post(routes.get("/dsh-quick-switcher/ask"), {
+    sessionId: "s1",
+    question: "why?",
+  });
+  assert.deepEqual(
+    eventsOf(response).map((event) => event.type),
+    ["start", "finish", "error"],
+  );
+  assert.match(eventsOf(response).at(-1).message, /UNSUPPORTED_REASONING_EFFORT/u);
+});
+
+test("a pinned model's window bounds the snapshot", async () => {
+  const llm = modelLlm({
+    models: { "q/small": { provider: "q", id: "small", context: { contextWindow: 5000 } } },
+  });
+  const { ctx, routes } = createContext({ agent: createAgent(), llm });
+  apply(ctx);
+
+  // The session window would fit this question; the pinned model's would not.
+  const response = await post(routes.get("/dsh-quick-switcher/ask"), {
+    sessionId: "s1",
+    question: "x".repeat(13000),
+    provider: "q",
+    model: "small",
+  });
+  assert.equal(response.status, 413);
+  assert.equal(llm.requests.length, 0);
 });
 
 test("unloading removes the live listeners", () => {

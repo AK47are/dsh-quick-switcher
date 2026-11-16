@@ -7,28 +7,41 @@ const h = React.createElement;
 
 const STYLE = `
 .dqs-settings-page {
+  /* Type scale and rhythm copied from DSH's own settings rows: the General page
+   * uses 14/20 row titles, 12/18 notes, 16px row padding and 12px gaps between
+   * sections. The host also ships a --dsw-font-* scale, but none of its settings
+   * surfaces read that scale yet, so copying the literals is the alignment that
+   * actually holds when a plugin page sits next to a first party one. */
+  --dqs-font-lead-size: 14px;
+  --dqs-font-lead-line: 22px;
+  --dqs-font-section-size: 14px;
+  --dqs-font-section-line: 22px;
+  --dqs-font-group-size: 12px;
+  --dqs-font-group-line: 18px;
+  --dqs-font-row-size: 14px;
+  --dqs-font-row-line: 20px;
+  --dqs-font-note-size: 12px;
+  --dqs-font-note-line: 18px;
+  --dqs-font-tag-size: 11px;
+  --dqs-font-tag-line: 16px;
+  --dqs-section-gap: 12px;
+  --dqs-row-padding: 16px 0;
+  --dqs-text-gap: 4px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--dqs-section-gap);
 }
-.dqs-settings-heading {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-bottom: 4px;
-}
-.dqs-settings-title {
+.dqs-settings-lead {
   margin: 0;
-  color: var(--dsw-alias-label-primary);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 22px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dqs-font-lead-size);
+  line-height: var(--dqs-font-lead-line);
 }
 .dqs-settings-description {
   margin: 0;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: var(--dqs-font-note-size);
+  line-height: var(--dqs-font-note-line);
 }
 .dqs-settings-sectionHeading {
   margin: 0;
@@ -38,7 +51,7 @@ const STYLE = `
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 2px 4px;
+  padding: 4px;
   margin-left: -4px;
   border: 0;
   border-radius: 6px;
@@ -69,38 +82,38 @@ const STYLE = `
   min-width: 0;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--dqs-font-note-size);
+  line-height: var(--dqs-font-note-line);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .dqs-settings-sectionBody {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-top: 2px;
+  gap: var(--dqs-text-gap);
+  padding-top: 4px;
 }
 .dqs-settings-moduleTitle {
   margin: 0;
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
+  font-size: var(--dqs-font-section-size);
+  font-weight: 500;
+  line-height: var(--dqs-font-section-line);
 }
 .dqs-settings-groupTitle {
   margin: 2px 0 0;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: var(--dqs-font-group-size);
+  font-weight: 500;
+  line-height: var(--dqs-font-group-line);
 }
 .dqs-settings-row {
   box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 0;
+  gap: 24px;
+  padding: var(--dqs-row-padding);
   border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
 .dqs-settings-rowStack {
@@ -115,22 +128,22 @@ const STYLE = `
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--dqs-text-gap);
   min-width: 0;
   padding-right: 24px;
 }
 .dqs-settings-rowTitle {
   color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  line-height: 19px;
+  font-size: var(--dqs-font-row-size);
+  line-height: var(--dqs-font-row-line);
 }
 .dqs-settings-rowDescription,
 .dqs-settings-rowHint,
 .dqs-settings-warning {
   margin: 0;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 17px;
+  font-size: var(--dqs-font-note-size);
+  line-height: var(--dqs-font-note-line);
 }
 .dqs-settings-rowHint {
   color: var(--dsw-alias-label-tertiary);
@@ -144,8 +157,8 @@ const STYLE = `
   border-radius: 999px;
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--dqs-font-tag-size);
+  line-height: var(--dqs-font-tag-line);
 }
 .dqs-settings-switch {
   position: relative;
@@ -194,8 +207,8 @@ const STYLE = `
   border-radius: 999px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--dqs-font-note-size);
+  line-height: var(--dqs-font-note-line);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -232,8 +245,8 @@ const STYLE = `
   align-items: center;
   gap: 8px;
   color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--dqs-font-note-size);
+  line-height: var(--dqs-font-note-line);
   cursor: pointer;
 }
 .dqs-settings-choice input {
@@ -268,6 +281,10 @@ const STYLE = `
  * store the modules read. A module registered or switched off while the page is
  * open re-renders through the registry subscription, and a switch recorded in
  * another tab arrives through the store subscription.
+ *
+ * The page carries no title of its own: the host paints the section label in the
+ * dialog navigation, and its own General page renders no heading either, so a
+ * second copy would only repeat the nav item.
  */
 export function createSettingsSection({ settings, registry, t, tModule }) {
   return function SettingsSection() {
@@ -286,12 +303,7 @@ export function createSettingsSection({ settings, registry, t, tModule }) {
       "div",
       { className: "dqs-settings-page" },
       h("style", null, STYLE),
-      h(
-        "div",
-        { className: "dqs-settings-heading" },
-        h("h2", { className: "dqs-settings-title" }, t("settingsTitle")),
-        h("p", { className: "dqs-settings-description" }, t("settingsDescription")),
-      ),
+      h("p", { className: "dqs-settings-lead" }, t("settingsDescription")),
       empty
         ? h("p", { className: "dqs-settings-description" }, t("settingsEmpty"))
         : null,

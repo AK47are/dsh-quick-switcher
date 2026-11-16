@@ -13,6 +13,7 @@
 import { isModuleDefinition } from "./module.js";
 import { validateMount, validateSpec, validateView } from "./validate.js";
 import { API_VERSION } from "../../module.js";
+import { createSharedStores } from "./shared-store.js";
 
 function once(callback, log) {
   let done = false;
@@ -70,6 +71,7 @@ export function createRegistry(deps = {}) {
   const records = new Map();
   const views = new Map();
   const listeners = new Set();
+  const shared = deps.shared ?? createSharedStores();
   let sequence = 0;
   let disposed = false;
 
@@ -141,6 +143,7 @@ export function createRegistry(deps = {}) {
       get,
       settings: scope,
       panel,
+      shared,
       effect: (callback, label) => keep(effect(callback, label ?? `quick-switcher: ${id}`)),
       log: {
         info: (...args) => log.info?.(`[dsh-quick-switcher:${id}]`, ...args),
@@ -452,6 +455,7 @@ export function createRegistry(deps = {}) {
     for (const record of [...records.values()]) record.dispose?.();
     records.clear();
     views.clear();
+    shared.dispose();
     listeners.clear();
   }
 

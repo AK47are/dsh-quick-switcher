@@ -31,6 +31,7 @@ export function SwitcherShell({
   services,
   get,
   currentSessionId,
+  activePanelId,
   pending,
   seed,
   generation,
@@ -54,8 +55,8 @@ export function SwitcherShell({
   const mountedRef = React.useRef(null);
   const queryRef = React.useRef(query);
   queryRef.current = query;
-  const latest = React.useRef({ currentSessionId, pending });
-  latest.current = { currentSessionId, pending };
+  const latest = React.useRef({ currentSessionId, activePanelId, pending });
+  latest.current = { currentSessionId, activePanelId, pending };
 
   // Hover only moves the caret once the pointer really moved. Browsers replay
   // hover events for elements that appear under a stationary pointer, so an
@@ -110,6 +111,9 @@ export function SwitcherShell({
     () => ({
       get currentSessionId() {
         return latest.current.currentSessionId;
+      },
+      get activePanelId() {
+        return latest.current.activePanelId;
       },
       get pending() {
         return latest.current.pending;

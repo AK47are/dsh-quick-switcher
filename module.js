@@ -57,8 +57,25 @@ export function defineModule(id, setup) {
  * @property {(name: string) => unknown} get optional service lookup
  * @property {ModuleSettingsScope} settings
  * @property {ModulePanelController} panel
+ * @property {ModuleShared} shared
  * @property {(callback: () => unknown, label?: string) => () => void} effect
  * @property {{ info: Function, warn: Function, error: Function }} log
+ */
+
+/**
+ * Named stores a module may publish to or read from without importing the
+ * module that owns the data. A name nobody published yet reads as null.
+ *
+ * @typedef {object} ModuleShared
+ * @property {(name: string) => SharedStore} store
+ */
+
+/**
+ * @typedef {object} SharedStore
+ * @property {string} name
+ * @property {() => unknown} getSnapshot
+ * @property {(value: unknown) => void} publish
+ * @property {(listener: (value: unknown) => void) => () => void} subscribe
  */
 
 /**
@@ -110,6 +127,7 @@ export function defineModule(id, setup) {
 /**
  * @typedef {object} PanelContext
  * @property {string|null} currentSessionId
+ * @property {string|null} activePanelId
  * @property {unknown} pending
  * @property {number} now
  * @property {string} query

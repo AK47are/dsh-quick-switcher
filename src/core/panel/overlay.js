@@ -43,6 +43,7 @@ export function createOverlay({ registry, controller, t, services, get }) {
       services,
       get,
       currentSessionId,
+      activePanelId,
       pending,
       seed: state.seed,
       generation: state.generation,

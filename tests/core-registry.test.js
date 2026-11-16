@@ -445,6 +445,48 @@ test("unregistering a module disposes its live mount and removes its view kind",
   assert.equal(mounted.contentFor("alphaView"), null);
 });
 
+test("modules share one named store without importing each other", () => {
+  const { registry } = createHarness();
+  let writer = null;
+  let reader = null;
+  registry.register(
+    defineModule("writer", (api) => {
+      writer = api.shared.store("session-data");
+      return {};
+    }),
+  );
+  registry.register(
+    defineModule("reader", (api) => {
+      reader = api.shared.store("session-data");
+      return {};
+    }),
+  );
+  assert.equal(writer, reader);
+  assert.equal(reader.getSnapshot(), null);
+  const seen = [];
+  reader.subscribe((value) => seen.push(value));
+  writer.publish({ entries: [1] });
+  assert.deepEqual(reader.getSnapshot(), { entries: [1] });
+  assert.equal(seen.length, 1);
+});
+
+test("a shared store name must be non-empty and disposal clears the bus", () => {
+  const { registry } = createHarness();
+  let shared = null;
+  registry.register(
+    defineModule("alpha", (api) => {
+      shared = api.shared;
+      return {};
+    }),
+  );
+  assert.throws(() => shared.store(""), /non-empty name/);
+  const store = shared.store("one");
+  store.publish({ a: 1 });
+  registry.disposeAll();
+  assert.equal(store.getSnapshot(), null);
+  assert.throws(() => shared.store("two"), /disposed/);
+});
+
 test("disposeAll cleans every module and closes the registry", () => {
   const { registry } = createHarness();
   let cleaned = 0;

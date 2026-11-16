@@ -161,6 +161,79 @@ test("the store rebuilds on catalog and config changes and stops on dispose", ()
   assert.equal(store.getSnapshot().entries.length, 2);
 });
 
+test("command search matches labels first and aliases second", () => {
+  const shortcuts = createShortcuts({
+    catalog: [
+      { id: "settings.open", label: "Settings", aliases: ["preferences"] },
+      { id: "session.new", label: "New session", aliases: ["new chat"] },
+    ],
+  });
+  const api = {
+    id: "commands",
+    t,
+    services: { shortcuts },
+    shared: createSharedStores(),
+    effect: (callback) => {
+      const dispose = callback();
+      return typeof dispose === "function" ? dispose : () => {};
+    },
+    settings: { get: () => undefined, set() {}, subscribe: () => () => {} },
+    log: {},
+  };
+  const spec = commands.setup(api);
+  const panel = panelOf();
+  const matcher = spec.mount(panel).matchers[0];
+  const byLabel = matcher.view(matcher.match(">sett"), panel);
+  assert.deepEqual(
+    byLabel.rows.map((row) => row.key),
+    ["x:settings.open"],
+  );
+  assert.ok(byLabel.rows[0].positions.size > 0);
+  const byAlias = matcher.view(matcher.match(">pref"), panel);
+  assert.deepEqual(
+    byAlias.rows.map((row) => row.key),
+    ["x:settings.open"],
+  );
+  assert.equal(byAlias.rows[0].positions.size, 0);
+});
+
+test("the command view explains loading, an empty catalog, and no match", () => {
+  const loading = createShortcuts({ catalog: [], config: { status: "loading" } });
+  const loadingApi = {
+    id: "commands",
+    t,
+    services: { shortcuts: loading },
+    shared: createSharedStores(),
+    effect: (callback) => {
+      const dispose = callback();
+      return typeof dispose === "function" ? dispose : () => {};
+    },
+    settings: { get: () => undefined, set() {}, subscribe: () => () => {} },
+    log: {},
+  };
+  const loadingSpec = commands.setup(loadingApi);
+  const panel = panelOf();
+  const loadingMatcher = loadingSpec.mount(panel).matchers[0];
+  assert.equal(loadingMatcher.view(loadingMatcher.match(">"), panel).emptyText, "loadingCommands");
+
+  const empty = createShortcuts({ catalog: [] });
+  const emptyApi = {
+    ...loadingApi,
+    services: { shortcuts: empty },
+  };
+  const emptySpec = commands.setup(emptyApi);
+  const emptyMatcher = emptySpec.mount(panel).matchers[0];
+  assert.equal(emptyMatcher.view(emptyMatcher.match(">"), panel).emptyText, "emptyCommands");
+
+  const full = createShortcuts({ catalog: [{ id: "a", label: "Alpha" }] });
+  const fullApi = { ...loadingApi, services: { shortcuts: full } };
+  const fullMatcher = commands.setup(fullApi).mount(panel).matchers[0];
+  assert.equal(
+    fullMatcher.view(fullMatcher.match(">zzz"), panel).emptyText,
+    "emptyCommandMatches",
+  );
+});
+
 test("the command view filters, runs a handled command and records it", async () => {
   const previous = globalThis.localStorage;
   const storage = new MemoryStorage();

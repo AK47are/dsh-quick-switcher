@@ -4,7 +4,7 @@ import {
   ACCESS_ENTRY_LIMIT,
   ACCESS_STORAGE_KEY,
   createAccessStore,
-} from "../src/data/access.js";
+} from "../src/modules/sessions/access.js";
 
 class MemoryStorage {
   constructor() {
@@ -93,3 +93,4 @@ test("a denied storage keeps the in-memory map working", () => {
   store.record("s1", 100);
   assert.equal(store.getSnapshot().get("s1"), 100);
 });
+

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { RESULT_LIMIT, filterEntries, fuzzyMatch } from "../src/data/search.js";
+import { RESULT_LIMIT, filterEntries, fuzzyMatch } from "../src/core/lib/search.js";
 
 function entry(id, title, meta, updatedAt = 0) {
   return {
@@ -141,3 +141,4 @@ test("a title hit outranks an id hit", () => {
 test("the id rule does not apply to entries without an id key", () => {
   assert.deepEqual(filterEntries(entries, "63cb"), []);
 });
+

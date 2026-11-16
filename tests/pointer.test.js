@@ -5,7 +5,7 @@ import {
   createPointerGate,
   getPointerBaseline,
   startPointerBaseline,
-} from "../src/pointer.js";
+} from "../src/core/panel/pointer.js";
 
 class FakeTarget {
   constructor() {
@@ -71,3 +71,4 @@ test("the baseline stops recording once disposed", () => {
   target.dispatch("pointermove", { clientX: 7, clientY: 8 });
   assert.deepEqual(getPointerBaseline(), { x: 5, y: 6 });
 });
+

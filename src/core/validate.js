@@ -334,7 +334,10 @@ export function validateMount(moduleId, surface) {
     fail(moduleId, "mount dispose must be a function");
   }
 
-  return { providers, matchers: normalizedMatchers, dispose };
+  // Additional fields belong to the module: the shell passes the whole surface
+  // to that module's providers and content renderers as `instance`, which is how
+  // a detail component reaches its store and actions.
+  return { ...surface, providers, matchers: normalizedMatchers, dispose: dispose ?? null };
 }
 
 function validateDescriptor(moduleId, matcherId, value, field) {

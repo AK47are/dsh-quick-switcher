@@ -4,7 +4,7 @@ import {
   collectPanelEntries,
   createPanelStore,
   resolvePanelLabel,
-} from "../src/data/panels.js";
+} from "../src/modules/panels/logic.js";
 import { createPanelsRoute } from "../src/routes/panels.js";
 
 /** Registrations shaped like the slot entries the sidebar also reads. */
@@ -80,96 +80,6 @@ test("a label equal to the id does not repeat it under the title", () => {
   assert.equal(entry.idText, "");
 });
 
-test("only a leading # claims the query", () => {
-  const route = createPanelsRoute();
-  assert.deepEqual(route.parse("#"), { filter: "" });
-  assert.deepEqual(route.parse("#plu"), { filter: "plu" });
-  assert.equal(route.parse("plu"), null);
-  assert.equal(route.parse("a#b"), null);
-});
-
-test("the panel route lists every registration in order", () => {
-  const route = createPanelsRoute();
-  const entries = collectPanelEntries(registrations);
-  const view = route.view(route.parse("#"), context(entries));
-  assert.deepEqual(
-    view.rows.map((row) => row.key),
-    ["p:plugins", "p:schedules"],
-  );
-  assert.equal(view.placeholder, "placeholderPanels");
-  assert.equal(view.count, "countPanels:2");
-  assert.deepEqual(view.rows[0].meta, [
-    { text: "plugins", className: "dqs-panel-id" },
-  ]);
-  assert.equal(view.rows[0].badge, undefined);
-});
-
-test("panel search matches the label first and the id second", () => {
-  const route = createPanelsRoute();
-  const entries = collectPanelEntries(registrations);
-
-  const byLabel = route.view(route.parse("#插件"), context(entries));
-  assert.deepEqual(
-    byLabel.rows.map((row) => row.key),
-    ["p:plugins"],
-  );
-  assert.ok(byLabel.rows[0].positions.size > 0);
-
-  const byId = route.view(route.parse("#sched"), context(entries));
-  assert.deepEqual(
-    byId.rows.map((row) => row.key),
-    ["p:schedules"],
-  );
-  assert.equal(byId.rows[0].positions.size, 0);
-});
-
-test("the current panel is badged and Enter closes instead of reopening it", () => {
-  const route = createPanelsRoute();
-  const entries = collectPanelEntries(registrations);
-  const view = route.view(route.parse("#"), context(entries, "plugins"));
-
-  const opened = [];
-  const activation = {
-    openPanel(id) {
-      opened.push(id);
-      return true;
-    },
-  };
-
-  assert.equal(view.rows[0].badge, "current");
-  assert.deepEqual(view.rows[0].run(activation), {
-    type: "close",
-    restoreFocus: true,
-  });
-  assert.deepEqual(opened, []);
-
-  assert.deepEqual(view.rows[1].run(activation), {
-    type: "close",
-    restoreFocus: false,
-  });
-  assert.deepEqual(opened, ["schedules"]);
-});
-
-test("a refused panel keeps the overlay open and yields no effect", () => {
-  const route = createPanelsRoute();
-  const entries = collectPanelEntries(registrations);
-  const view = route.view(route.parse("#"), context(entries));
-  assert.equal(
-    view.rows[0].run({ openPanel: () => false }),
-    undefined,
-  );
-});
-
-test("the route tells an empty registry from an empty match", () => {
-  const route = createPanelsRoute();
-  assert.equal(route.view(route.parse("#"), context([])).emptyText, "emptyPanels");
-  const entries = collectPanelEntries(registrations);
-  assert.equal(
-    route.view(route.parse("#zzz"), context(entries)).emptyText,
-    "emptyPanelMatches",
-  );
-});
-
 test("the panel store notifies only when the rows really change", () => {
   let next = collectPanelEntries(registrations);
   let calls = 0;
@@ -200,3 +110,4 @@ test("the panel store notifies only when the rows really change", () => {
   assert.equal(calls, 2);
   assert.deepEqual(store.getSnapshot(), []);
 });
+

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { digitRowIndex } from "../src/panel/digit-jump.js";
+import { digitRowIndex } from "../src/core/panel/digit-jump.js";
 
 /** A keyboard event shape carrying only the fields the helper reads. */
 function press(overrides = {}) {
@@ -51,3 +51,4 @@ test("a missing or malformed event is ignored", () => {
   assert.equal(digitRowIndex(undefined), null);
   assert.equal(digitRowIndex("Alt+1"), null);
 });
+

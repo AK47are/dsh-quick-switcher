@@ -5,7 +5,7 @@ import {
   PENDING_ORDER_LEAST_RECENT,
   PENDING_ORDER_MOST_RECENT,
 } from "../../core/lib/pending-order.js";
-import { createAccessStore } from "../../data/access.js";
+import { createAccessStore } from "./access.js";
 import { locale } from "./locale.js";
 import { createSessionsPresenter } from "./presenter.js";
 import { createSessionRow } from "./row.js";
@@ -91,3 +91,4 @@ export default defineModule("sessions", (api) => {
     },
   };
 });
+

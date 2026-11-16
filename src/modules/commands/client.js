@@ -2,7 +2,7 @@
 
 import { defineModule } from "../../core/module.js";
 import { filterEntries } from "../../core/lib/search.js";
-import { createRecentCommands } from "../../data/recent.js";
+import { createRecentCommands } from "./recent.js";
 import { locale } from "./locale.js";
 import {
   commandContext,
@@ -122,3 +122,4 @@ export default defineModule("commands", (api) => {
     },
   };
 });
+

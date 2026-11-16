@@ -114,6 +114,10 @@ export function defineModule(id, setup) {
  * @property {Function[]} [providers]
  * @property {Matcher[]} [matchers]
  * @property {() => void} [dispose]
+ *
+ * Extra fields on the returned object are kept and handed to this module's
+ * providers and content renderers as `instance`, so a detail view can read the
+ * module's own store, UI state and actions.
  */
 
 /**

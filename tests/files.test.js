@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fileAddress, splitFilePath } from "../src/data/files.js";
+import { fileAddress, splitFilePath } from "../src/modules/files/path.js";
 
 test("splitFilePath returns the parent directory and the raw name", () => {
   assert.deepEqual(splitFilePath("src/components/App.tsx"), {
@@ -39,3 +39,4 @@ test("fileAddress ignores empty segments", () => {
     "dsh-resource://file/session/s1/src/a.ts",
   );
 });
+

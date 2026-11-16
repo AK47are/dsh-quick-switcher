@@ -5,13 +5,13 @@ import {
   commandContext,
   commandRegion,
   resolveCommand,
-} from "../src/data/commands.js";
+} from "../src/modules/commands/logic.js";
 import {
   RECENT_LIMIT,
   createRecentCommands,
   parseRecentCommands,
   pushRecentCommand,
-} from "../src/data/recent.js";
+} from "../src/modules/commands/recent.js";
 import { createCommandsRoute } from "../src/routes/commands.js";
 
 const catalog = [
@@ -109,66 +109,6 @@ test("recents keep their order, skip unknown ids, and never repeat", () => {
     entries.map((entry) => entry.id),
     ["shortcuts.open", "session.new", "settings.open"],
   );
-});
-
-test("command search matches labels first and aliases second", () => {
-  const route = createCommandsRoute();
-  const entries = buildCommandEntries(catalog, []);
-  const byLabel = route.view(route.parse(">sett"), context(entries));
-  assert.deepEqual(
-    byLabel.rows.map((row) => row.key),
-    ["x:settings.open"],
-  );
-  assert.ok(byLabel.rows[0].positions.size > 0);
-
-  const byAlias = route.view(route.parse(">pref"), context(entries));
-  assert.deepEqual(
-    byAlias.rows.map((row) => row.key),
-    ["x:settings.open"],
-  );
-  assert.equal(byAlias.rows[0].positions.size, 0);
-});
-
-test("the command route shows keycaps, the recent badge, and the run effect", () => {
-  const route = createCommandsRoute();
-  const entries = buildCommandEntries(catalog, ["session.new"]);
-  const view = route.view(route.parse(">"), context(entries));
-  assert.equal(view.placeholder, "placeholderCommands");
-  assert.equal(view.count, "countCommands:3");
-  assert.deepEqual(
-    view.rows.map((row) => row.key),
-    ["x:session.new", "x:settings.open", "x:shortcuts.open"],
-  );
-  assert.deepEqual(view.rows[0].keys, ["Ctrl", "+", "N"]);
-  assert.equal(view.rows[0].meta[0].text, "new chat");
-  assert.equal(view.rows[1].meta[0].text, "preferences");
-  assert.equal(view.rows[0].badge, "recentBadge");
-  assert.equal(view.rows[1].badge, undefined);
-  assert.deepEqual(view.rows[1].run(), { type: "command", id: "settings.open" });
-});
-
-test("the command route explains loading, an empty catalog, and no match", () => {
-  const route = createCommandsRoute();
-  assert.equal(
-    route.view(route.parse(">"), context([], true)).emptyText,
-    "loadingCommands",
-  );
-  assert.equal(
-    route.view(route.parse(">"), context([])).emptyText,
-    "emptyCommands",
-  );
-  const entries = buildCommandEntries(catalog, []);
-  assert.equal(
-    route.view(route.parse(">zzz"), context(entries)).emptyText,
-    "emptyCommandMatches",
-  );
-});
-
-test("only a leading > claims the query", () => {
-  const route = createCommandsRoute();
-  assert.deepEqual(route.parse(">set"), { filter: "set" });
-  assert.deepEqual(route.parse(">"), { filter: "" });
-  assert.equal(route.parse("set"), null);
 });
 
 test("resolveCommand forwards handled runs and keeps blocked reasons", () => {
@@ -300,3 +240,4 @@ test("a denied storage keeps the recent list usable in memory", () => {
   assert.deepEqual(recent.read(), []);
   assert.deepEqual(recent.record("id"), ["id"]);
 });
+

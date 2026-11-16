@@ -240,6 +240,43 @@ test("a start failure keeps the panel open and reports the error", () => {
   assert.equal(harness.panel.error, "createFailed");
 });
 
+test("the longest matching title wins when titles overlap", () => {
+  const harness = createHarness();
+  const entries = [entryOf("q1e", "One"), entryOf("q2e", "Two")];
+  harness.shared.publish({
+    entries,
+    currentId: null,
+    workspaceRows: [
+      {
+        workspaceId: "q1",
+        title: "dsh",
+        path: "/p/dsh",
+        sessions: [entries[0]],
+        count: 1,
+        updatedAt: 10,
+      },
+      {
+        workspaceId: "q2",
+        title: "dsh quick",
+        path: "/p/dsh-quick",
+        sessions: [entries[1]],
+        count: 1,
+        updatedAt: 20,
+      },
+    ],
+    rowFor: () => ({ key: "s:q1e", title: "One", run() {} }),
+  });
+  const longest = harness.matcher.match("+dsh quick anything");
+  assert.equal(longest.mode, "scope");
+  assert.equal(longest.workspace.workspaceId, "q2");
+  assert.equal(longest.filter, "anything");
+
+  const shorter = harness.matcher.match("+dsh quickfix");
+  assert.equal(shorter.mode, "scope");
+  assert.equal(shorter.workspace.workspaceId, "q1");
+  assert.equal(shorter.filter, "quickfix");
+});
+
 test("a published snapshot asks the open panel for one more render", () => {
   const harness = createHarness();
   let notifications = 0;

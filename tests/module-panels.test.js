@@ -174,6 +174,29 @@ test("empty deployment and empty filter read differently", () => {
   assert.equal(oneMatcher.view(oneMatcher.match("#zzz"), panel).emptyText, "emptyPanelMatches");
 });
 
+test("panel search highlights the label and only matches the id second", () => {
+  const harness = createHarness({
+    registrations: [
+      { options: { id: "plugins", label: "插件", order: 0 } },
+      { options: { id: "schedule", label: "自动化任务", order: 1 } },
+    ],
+  });
+  const panel = panelOf();
+  const matcher = harness.spec.mount(panel).matchers[0];
+  const byLabel = matcher.view(matcher.match("#插件"), panel);
+  assert.deepEqual(
+    byLabel.rows.map((row) => row.key),
+    ["p:plugins"],
+  );
+  assert.ok(byLabel.rows[0].positions.size > 0);
+  const byId = matcher.view(matcher.match("#sched"), panel);
+  assert.deepEqual(
+    byId.rows.map((row) => row.key),
+    ["p:schedule"],
+  );
+  assert.equal(byId.rows[0].positions.size, 0);
+});
+
 test("a registration or a locale switch refreshes an open list", () => {
   const harness = createHarness();
   let notifications = 0;

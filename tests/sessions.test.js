@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { collectSessionEntries } from "../src/data/sessions.js";
+import { collectSessionEntries } from "../src/modules/sessions/projection.js";
 
 function session(overrides) {
   return {
@@ -372,3 +372,4 @@ test("a pinned pending row still leads the list", () => {
   assert.equal(entries[0].pinned, true);
   assert.equal(entries[0].current, false);
 });
+

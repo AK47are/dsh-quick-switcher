@@ -5,7 +5,7 @@ import {
   SHORT_ID_LENGTH,
   idKeyOf,
   shortIdOf,
-} from "../src/data/ids.js";
+} from "../src/core/lib/ids.js";
 
 test("the key drops the session prefix, the hyphens, and the case", () => {
   assert.equal(idKeyOf("session-63CB1FD1-27b3-4b86"), "63cb1fd127b34b86");
@@ -35,3 +35,4 @@ test("an id too short to search gets no short code", () => {
   assert.equal(shortIdOf(""), "");
   assert.equal(shortIdOf(undefined), "");
 });
+

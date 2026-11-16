@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rowTimeLabel } from "../src/data/format.js";
+import { rowTimeLabel } from "../src/core/lib/format.js";
 
 const t = (key, vars) => (vars === undefined ? key : `${key}:${vars.count}`);
 
@@ -39,3 +39,4 @@ test("the compact pending label wins over both times", () => {
     "statusCompactApproval",
   );
 });
+

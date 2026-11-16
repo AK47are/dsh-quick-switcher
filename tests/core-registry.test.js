@@ -401,6 +401,20 @@ test("closing the panel disposes mounts in reverse order and drops matcher ids",
   );
 });
 
+test("the mount surface carries module-owned fields to providers and content", () => {
+  const { registry } = createHarness();
+  const store = { getSnapshot: () => 1 };
+  registry.register(
+    defineModule("alpha", () => ({
+      views: { alphaView: { content: () => null } },
+      mount: () => ({ store, providers: [() => null], matchers: [] }),
+    })),
+  );
+  const mounted = registry.mount(panelOf());
+  assert.equal(mounted.providers()[0].instance.store, store);
+  assert.equal(mounted.contentFor("alphaView").instance.store, store);
+});
+
 test("a mount that returns an invalid surface releases its own resources", () => {
   const { registry, calls } = createHarness();
   let cleaned = 0;

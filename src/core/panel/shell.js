@@ -6,6 +6,7 @@ import { digitRowIndex } from "./digit-jump.js";
 import { CloseGlyph, RowView, SearchGlyph } from "./rows.js";
 import { Hints } from "./hints.js";
 import { STYLE } from "./styles.js";
+import { viewTranslator } from "./view-translator.js";
 
 const h = React.createElement;
 
@@ -28,6 +29,7 @@ export function SwitcherShell({
   registry,
   controller,
   t,
+  translate,
   services,
   get,
   currentSessionId,
@@ -163,6 +165,11 @@ export function SwitcherShell({
   const footerLookup =
     contentShown && view.footer !== null ? mounted.contentFor(view.footer.kind) : null;
   const Footer = footerLookup?.renderer.footer ?? null;
+  // A view kind is registered by one module, so the renderer's copy comes from
+  // that module's dictionary and only falls back to the shared one. Handing a
+  // content view the core translator would print keys such as `askCopy`.
+  const contentT = viewTranslator(translate, t, contentLookup);
+  const footerT = viewTranslator(translate, t, footerLookup);
 
   /** Log a broken view once per matcher and phase, then keep the panel alive. */
   const reportViewError = (phase, error) => {
@@ -430,7 +437,7 @@ export function SwitcherShell({
               descriptor: view.content,
               instance: contentLookup.instance,
               panel,
-              t,
+              t: contentT,
             }),
       )
     : h(
@@ -453,7 +460,7 @@ export function SwitcherShell({
           descriptor: view.footer,
           instance: footerLookup.instance,
           panel,
-          t,
+          t: footerT,
         })
     : [
         h(Hints, { key: "hints", hints }),

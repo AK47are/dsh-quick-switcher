@@ -14,8 +14,12 @@ const h = React.createElement;
  * displayed conversation and the pending interaction are the two session facts
  * every module may need, so they are resolved once here and handed to the panel
  * context. The sessions module still owns the list, ordering and access times.
+ *
+ * `t` covers shared copy; `translate` resolves one module's dictionary and is
+ * what a content view or its footer gets, because their keys belong to the
+ * module that registered the view kind.
  */
-export function createOverlay({ registry, controller, t, services, get }) {
+export function createOverlay({ registry, controller, t, translate, services, get }) {
   function Overlay({ useSessions, useSessionStatus, usePanelInfo }) {
     const state = React.useSyncExternalStore(
       controller.subscribe,
@@ -40,6 +44,7 @@ export function createOverlay({ registry, controller, t, services, get }) {
       registry,
       controller,
       t,
+      translate,
       services,
       get,
       currentSessionId,

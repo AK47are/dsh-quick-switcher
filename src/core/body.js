@@ -215,7 +215,19 @@ export function createBody({ ctx, modules }) {
     "quick-switcher: open command",
   );
 
-  const Overlay = createOverlay({ registry, controller, t: tCore, services, get });
+  // Content views and their footers render a module's own copy, so the shell
+  // needs a translator that is scoped to whichever module owns the view kind.
+  // The core dictionary stays the fallback for keys every view shares.
+  const tModule = (moduleId, key, params) => translator.t(moduleId, key, params);
+
+  const Overlay = createOverlay({
+    registry,
+    controller,
+    t: tCore,
+    translate: tModule,
+    services,
+    get,
+  });
   ctx.slots.inject("shell.overlay", () =>
     ctx.slots.register(
       {
@@ -231,7 +243,6 @@ export function createBody({ ctx, modules }) {
 
   // The settings page is one section; modules add their groups to it through
   // the same declaration the registry already collected.
-  const tModule = (moduleId, key, params) => translator.t(moduleId, key, params);
   const SettingsSection = createSettingsSection({
     settings,
     registry,

@@ -3,7 +3,7 @@
 import { defineModule, prefixMatcher } from "../../core/module.js";
 import { AskDetail, AskFooter } from "./detail.js";
 import { locale } from "./locale.js";
-import { createAskActions, createAskStore, createAskUi, createAskView } from "./logic.js";
+import { ASK_TRIGGERS, createAskActions, createAskStore, createAskUi, createAskView } from "./logic.js";
 import { LOWEST_EFFORT, readChoice } from "./models.js";
 import { createAskSettings } from "./settings.js";
 
@@ -83,7 +83,9 @@ export default defineModule("ask", (api) => {
         ui,
         actions,
         matchers: [
-          prefixMatcher("?", {
+          // Every compatibility spelling of "?" claims the mode; the view keeps
+          // whichever one the user typed in the locked question field.
+          prefixMatcher(ASK_TRIGGERS, {
             id: "ask",
             priority: 10,
             map: (text) => ({ text }),

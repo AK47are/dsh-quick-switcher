@@ -3,6 +3,8 @@ import test from "node:test";
 import { buildPendingContext } from "../src/modules/ask/context.js";
 import {
   ASK_COPY_FEEDBACK_MS,
+  ASK_TRIGGERS,
+  askTriggerOf,
   createAskActions,
   createAskUi,
   createAskView,
@@ -115,6 +117,7 @@ function panelOf(overrides = {}) {
     currentSessionId: "s1",
     pending: null,
     now: 0,
+    query: "",
     notifications: 0,
     queries: [],
     errors: [],
@@ -271,6 +274,19 @@ test("an empty list explains itself and counts the records", () => {
   assert.equal(result.note, null);
 });
 
+test("the trigger set is every spelling whose NFKC form is a question mark", () => {
+  assert.deepEqual(ASK_TRIGGERS, ["?", "？", "﹖", "︖"]);
+  for (const trigger of ASK_TRIGGERS) {
+    assert.equal(trigger.normalize("NFKC"), "?");
+  }
+  assert.equal(askTriggerOf("？why"), "？");
+  assert.equal(askTriggerOf("︖why"), "︖");
+  // The mark is a prefix: text that merely contains one is not a trigger.
+  assert.equal(askTriggerOf("why？"), null);
+  assert.equal(askTriggerOf(""), null);
+  assert.equal(askTriggerOf(null), null);
+});
+
 test("?text puts the ask row first and sends the whole text", () => {
   const store = fakeStore();
   const { view } = askViewOf({ store });
@@ -296,6 +312,18 @@ test("?text puts the ask row first and sends the whole text", () => {
 
   const detail = view.view({ text: "hello world" }, panel);
   assert.deepEqual(detail.content, { kind: "ask", props: { id: "r1" } });
+});
+
+test("a question asked with a compatibility mark keeps that mark", () => {
+  const store = fakeStore();
+  const { view } = askViewOf({ store });
+  const panel = panelOf({ query: "？hello" });
+  const result = view.view({ text: "hello" }, panel);
+
+  result.rows[0].run();
+  assert.deepEqual(panel.queries, ["？hello"]);
+  // The stored question never carries the mode prefix; the query keeps the mark.
+  assert.equal(store.calls[0].question, "hello");
 });
 
 test("the ask row carries the pending interaction as read-only background", () => {
@@ -378,6 +406,16 @@ test("a history row opens the detail, and back restores the list", () => {
   // list default.
   assert.equal(back.inputLocked, undefined);
   assert.equal(back.rows[0].key, "a:q");
+});
+
+test("opening a history row keeps the trigger the input carries", () => {
+  const store = fakeStore([record("r1", { question: "why?" })]);
+  const { view } = askViewOf({ store });
+  const panel = panelOf({ query: "︖current" });
+  const list = view.view({ text: "current" }, panel);
+
+  list.rows[1].run();
+  assert.deepEqual(panel.queries, ["︖why?"]);
 });
 
 test("a detail whose record disappeared falls back to the list", () => {

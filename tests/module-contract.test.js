@@ -210,10 +210,16 @@ test("the real client manifest registers every module and its contributions", as
     ["#", "panels"],
     ["+", "workspaces"],
     ["?", "ask"],
+    ["？", "ask"],
+    ["﹖", "ask"],
+    ["︖", "ask"],
   ];
   for (const [query, matcherId] of claims) {
     assert.equal(mounted.resolve(query).matcherId, matcherId, `query ${JSON.stringify(query)}`);
   }
+  // The compatibility mark is stripped like the ASCII one: the question text
+  // reaches the view, and the row is the ask row rather than a filter.
+  assert.equal(mounted.resolve("？问题").view.rows[0].key, "a:q");
   for (const module of harness.registry.modules()) {
     if (module.entry === null) continue;
     const expected = module.entry.mode ?? module.id;

@@ -18,6 +18,32 @@ export const ASK_SESSION_LIMIT = 8;
 export const ASK_COPY_FEEDBACK_MS = 1600;
 
 /**
+ * Every code point whose NFKC form is "?".
+ *
+ * A Chinese, Japanese or Korean IME types the fullwidth mark by default, so
+ * requiring a halfwidth `?` would force a punctuation switch before every side
+ * question. The vertical and small forms are compatibility variants that paste
+ * in from other tools; NFKC is the rule that groups them, and no other code
+ * point normalizes to a bare "?".
+ */
+export const ASK_TRIGGERS = Object.freeze([
+  "?", // U+003F, the ASCII mark
+  "\uFF1F", // U+FF1F, fullwidth, what a CJK IME types
+  "\uFE56", // U+FE56, small form
+  "\uFE16", // U+FE16, vertical presentation form
+]);
+
+/**
+ * The trigger a query starts with, or null when it starts with anything else.
+ * Only the first character is considered: the mark is a mode prefix, not a
+ * suffix or an infix.
+ */
+export function askTriggerOf(query) {
+  if (typeof query !== "string" || query === "") return null;
+  return ASK_TRIGGERS.find((trigger) => query.startsWith(trigger)) ?? null;
+}
+
+/**
  * Statuses that earn a badge in the list.
  *
  * A finished answer is the normal case and needs no label; running, stopped,
@@ -793,6 +819,17 @@ export function createAskView({ api, store, ui, actions }) {
   }
 
   /**
+   * The trigger the input currently starts with.
+   *
+   * The locked input is re-seeded from the row's own text, so it keeps the mark
+   * the user actually typed; a question typed after `？` was never halfwidth.
+   * The fallback covers tests and a query that has not resolved to ask yet.
+   */
+  function triggerOf(panel) {
+    return askTriggerOf(panel.query) ?? "?";
+  }
+
+  /**
    * One history row. The badge only appears for states that need a word:
    * a finished answer is the normal case.
    */
@@ -811,7 +848,7 @@ export function createAskView({ api, store, ui, actions }) {
         // makes the detail render even if that announcement is ever flushed
         // before `detailId` was assigned.
         panel.notify();
-        panel.setQuery(`?${record.question}`);
+        panel.setQuery(`${triggerOf(panel)}${record.question}`);
       },
     };
   }
@@ -892,7 +929,7 @@ export function createAskView({ api, store, ui, actions }) {
                 // request makes the detail render even if that announcement is
                 // ever flushed before `detailId` was assigned.
                 panel.notify();
-                panel.setQuery(`?${text}`);
+                panel.setQuery(`${triggerOf(panel)}${text}`);
               },
       });
     }

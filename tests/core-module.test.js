@@ -56,8 +56,39 @@ test("prefixMatcher claims a leading trigger and maps the rest", () => {
   assert.equal(mapped.priority, 0);
 });
 
+test("prefixMatcher accepts several triggers and the first one wins", () => {
+  const view = () => ({ rows: [] });
+  const ask = prefixMatcher(["?", "？"], { id: "ask", view });
+  assert.equal(ask.match("?q", {}).filter, "q");
+  assert.equal(ask.match("？q", {}).filter, "q");
+  assert.equal(ask.match("q?", {}), null);
+  assert.equal(ask.match("", {}), null);
+
+  // The array order, not the length, decides which overlapping trigger claims
+  // the query; the remainder still starts with the longer one.
+  const ordered = prefixMatcher([">", ">>"], { id: "commands", view });
+  assert.deepEqual(ordered.match(">>a", {}), { filter: ">a" });
+
+  const mapped = prefixMatcher(["@", "＠"], {
+    id: "files",
+    map: (text, panel) => ({ text, sessionId: panel.currentSessionId }),
+    view,
+  });
+  assert.deepEqual(mapped.match("＠src", { currentSessionId: "s1" }), {
+    text: "src",
+    sessionId: "s1",
+  });
+
+  // The sessions list has always claimed every query with an empty prefix.
+  const everything = prefixMatcher("", { id: "sessions", view });
+  assert.deepEqual(everything.match("anything", {}), { filter: "anything" });
+});
+
 test("prefixMatcher rejects a missing or malformed option", () => {
   assert.throws(() => prefixMatcher(1, { id: "a", view() {} }), /string prefix/);
+  assert.throws(() => prefixMatcher([], { id: "a", view() {} }), /string prefixes/);
+  assert.throws(() => prefixMatcher([">", null], { id: "a", view() {} }), /string prefixes/);
+  assert.throws(() => prefixMatcher([1], { id: "a", view() {} }), /string prefixes/);
   assert.throws(() => prefixMatcher(">", { view() {} }), /matcher id/);
   assert.throws(() => prefixMatcher(">", { id: "a" }), /view/);
   assert.throws(() => prefixMatcher(">", { id: "a", view() {}, map: 1 }), /map/);

@@ -137,7 +137,7 @@ npm run check 校验 client.js 与 src/ 是否一致，产物缺失时报缺失�
 
 模块声明在加载时执行一次，收到一份静态能力包（`id`、`t`、`settings`、`panel`、`shared`、`services`、`get`、`effect`、`log`），返回这些贡献：
 
-- matchers：输入认领与视图；每个匹配器有 id、priority、match 与 view，前缀用 prefixMatcher 生成，后缀或正则触发放进 match 即可
+- matchers：输入认领与视图；每个匹配器有 id、priority、match 与 view，前缀用 prefixMatcher 生成，可以传一个字符串或字符串数组，数组里先命中者生效；后缀或正则触发放进 match 即可
 - mount：每次打开面板创建一次，返回 providers、matchers 与 dispose；挂载面上的额外字段会作为 instance 交给该模块的 Provider 与内容渲染器
 - entry：直达命令的入口，形如 `{ seed, mode?, labelKey?, aliases?, defaults? }`；本体据此自动注册 `quickSwitcher.mode.<模块>`，并把模块列为默认打开模式的候选
 - descriptionKey 与 dependencies：设置页模块开关行的一句说明，以及读取了哪些模块发布的数据；依赖被关闭时设置页给出警告，但不联锁

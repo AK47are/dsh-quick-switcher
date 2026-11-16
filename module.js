@@ -52,11 +52,13 @@ export function defineModule(id, setup) {
  *
  * The common case is a prefix: `prefixMatcher(">", { id, view })` claims every
  * query that starts with ">" and hands the rest to the view as `{ filter }`.
- * Pass `map` for a different state shape, and `priority` when another module
- * can claim the same query. A matcher built here is a plain object, so a module
+ * Pass an array to accept several triggers: the first entry that matches in
+ * array order wins, and the rest of the query is handed on as before. Pass
+ * `map` for a different state shape, and `priority` when another module can
+ * claim the same query. A matcher built here is a plain object, so a module
  * may still write `match` by hand for suffix, regex or stateful triggers.
  *
- * @param {string} prefix
+ * @param {string | readonly string[]} prefix
  * @param {{
  *   id: string,
  *   view: (state: unknown, panel: PanelContext) => PanelView,
@@ -66,9 +68,19 @@ export function defineModule(id, setup) {
  * @returns {Matcher}
  */
 export function prefixMatcher(prefix, options) {
-  if (typeof prefix !== "string") {
-    throw new TypeError("dsh-quick-switcher: prefixMatcher needs a string prefix");
+  const candidates = typeof prefix === "string" ? [prefix] : prefix;
+  if (
+    !Array.isArray(candidates) ||
+    candidates.length === 0 ||
+    candidates.some((item) => typeof item !== "string")
+  ) {
+    throw new TypeError(
+      "dsh-quick-switcher: prefixMatcher needs a string prefix or a non-empty array of string prefixes",
+    );
   }
+  // Copy the triggers so a caller mutating its array cannot change the matcher
+  // after the registry has already sorted it.
+  const prefixes = [...candidates];
   const { id, view, priority = 0, map } = options ?? {};
   if (typeof id !== "string" || id === "") {
     throw new TypeError("dsh-quick-switcher: prefixMatcher needs a matcher id");
@@ -84,8 +96,10 @@ export function prefixMatcher(prefix, options) {
     id,
     priority,
     match(query, panel) {
-      if (typeof query !== "string" || !query.startsWith(prefix)) return null;
-      return stateOf(query.slice(prefix.length), panel);
+      if (typeof query !== "string") return null;
+      const hit = prefixes.find((item) => query.startsWith(item));
+      if (hit === undefined) return null;
+      return stateOf(query.slice(hit.length), panel);
     },
     view,
   };

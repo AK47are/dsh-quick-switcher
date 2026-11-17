@@ -108,12 +108,14 @@ function check(index) {
   return parsed;
 }
 
-const index = sortVersions(withCurrentVersion(readIndex()));
-
 if (process.argv.includes("--check")) {
-  check(index);
+  // Validate the committed document itself: injecting the current version
+  // before checking would make a stale index pass, which is the one failure
+  // this mode exists to catch.
+  check(readIndex());
   console.log(`market/index.json lists ${pkg.name}@${pkg.version}`);
 } else {
+  const index = sortVersions(withCurrentVersion(readIndex()));
   check(index);
   writeFileSync(indexPath, JSON.stringify(index, null, 2) + "\n");
   console.log(`market/index.json written for ${pkg.name}@${pkg.version}`);

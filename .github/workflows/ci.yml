@@ -33,6 +33,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      # Packs, extracts and imports the host entry: a checkout has src/, the
+      # published tarball must not need it.
+      - run: npm run pack:check
       # Fails when package.json moved to a version the committed index does not
       # list yet, which is the one release step that is easy to forget.
       - run: npm run market:check

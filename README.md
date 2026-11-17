@@ -1,8 +1,8 @@
-中文 | [English](README.en.md)
+中文 | [English](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.en.md)
 
 快速切换器把 DSH 会话里的一个输入框变成统一搜索入口：在会话与工作区之间跳转、运行任意应用命令、把历史提示词填回输入框、跳到主面板、预览工作区文件，还能就当前会话问一个不进入主对话的侧问。整个流程以键盘为主，每个模式都能在设置里关掉。
 
-![命令模式盖在会话页上](.agents/docs/assets/overview.png)
+![命令模式盖在会话页上](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/overview.png)
 
 ## 模式
 
@@ -16,7 +16,7 @@
 | `!` | 输入历史 | 你发过的提示词，以及你在提问卡里给出的回答 |
 | `#` | 主面板 | 插件、自动化任务与其他整页界面 |
 | `@` | 文件 | 当前会话工作目录下的文件 |
-| `?` 或 `？` | 侧问 | 侧问记录；触发符后面的文字就是问题 |
+| `?`、`？`、`﹖`、`︖` | 侧问 | 侧问记录；触发符后面的文字就是问题 |
 
 侧问的触发符也认结尾，所以 `改了什么?` 会发问，而 `@file?` 仍在过滤文件。其余触发符只在输入框最前面生效。
 
@@ -36,7 +36,7 @@
 dsh plugin --profile web add dsh-quick-switcher
 ```
 
-npm 包里带的是构建好的客户端产物，安装过程不跑任何构建脚本。命令行安装后重启 `dsh web`。
+npm 包里带的是构建好的客户端与宿主产物，安装过程不跑任何构建脚本。命令行安装后重启 `dsh web`。
 
 从源码安装：
 
@@ -58,13 +58,13 @@ npm install
 - 每个带入口的模式都会注册「快速切换器：<模式>」，默认不绑键
 - 设置里可以逐个开关模式，并指定直接打开时落在哪个模式
 
-![设置页的模块开关](.agents/docs/assets/settings-modules.png)
+![设置页的模块开关](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/settings-modules.png)
 
 ## 侧问
 
 输入 `?` 或 `？` 再输入问题，回车即可。答案在列表区流式显示，并交给会话面板同一个 Markdown 渲染器，因此表格、任务列表、公式与代码高亮都与主对话一致。
 
-![侧问详情：答案在列表区流式显示](.agents/docs/assets/side-question.png)
+![侧问详情：答案在列表区流式显示](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/side-question.png)
 
 - 主会话运行中时，问题会带上当前步骤与正在生成的正文；空闲时带上已落盘的历史
 - 默认跟随当前会话的模型，推理等级取最低档；两者都可以在设置里固定
@@ -90,7 +90,7 @@ npm install
 
 ## 文档
 
-这些文档都由 AI 生成，统一放在 `.agents/docs/` 下：完整行为参考是[使用指南](.agents/docs/使用指南.md)，给其他插件用的模块接口是[扩展指南](.agents/docs/扩展指南.md)，每个难以回退的决定记录在[ADR 索引](.agents/docs/adr/索引.md)。英文版是[使用指南](.agents/docs/使用指南.en.md)与[扩展指南](.agents/docs/扩展指南.en.md)，本页对应的英文版是 [README.en.md](README.en.md)。
+这些文档都由 AI 生成，统一放在 `.agents/docs/` 下：完整行为参考是[使用指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.md)，给其他插件用的模块接口是[扩展指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.md)，每个难以回退的决定记录在[ADR 索引](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/adr/索引.md)。英文版是[使用指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.en.md)与[扩展指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.en.md)，本页对应的英文版是 [README.en.md](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.en.md)。
 
 ## 许可证
 

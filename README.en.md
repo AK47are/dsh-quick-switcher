@@ -1,8 +1,8 @@
-English | [中文](README.md)
+English | [中文](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.md)
 
 Quick switcher turns one input box into the search surface for the whole DSH session: jump between sessions and workspaces, run any application command, refill the prompt box from your history, open a main panel, preview workspace files, and ask a side question that never enters the main conversation. It is keyboard first, and every mode can be switched off in Settings.
 
-![The command mode over a session page](.agents/docs/assets/overview.png)
+![The command mode over a session page](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/overview.png)
 
 ## Modes
 
@@ -16,7 +16,7 @@ Each mode is a list behind the same input box, and a trigger character at the st
 | `!` | History | prompts you sent and answers you gave to question cards |
 | `#` | Main panels | Plugins, Automation tasks and any other full-page panel |
 | `@` | Files | files under the current session working directory |
-| `?` or `？` | Side question | side-question records; the text after the mark is the question |
+| `?`, `？`, `﹖`, `︖` | Side question | side-question records; the text after the mark is the question |
 
 The side-question trigger also works at the end of the input, so `what changed?` asks a question while `@file?` still filters files. The other triggers only count at the very start.
 
@@ -36,7 +36,7 @@ From npm, by package name in the plugin manager, or:
 dsh plugin --profile web add dsh-quick-switcher
 ```
 
-The npm package ships the built client bundle, so installing runs no build script. Restart `dsh web` after a command-line install.
+The npm package ships both built entries, so installing runs no build script. Restart `dsh web` after a command-line install.
 
 From source:
 
@@ -58,13 +58,13 @@ Press Ctrl+Shift+K to open the panel, type to filter, move with the arrow keys, 
 - Every mode with an entry command registers "Quick switcher: <mode>", unbound by default
 - Settings can switch each mode on or off, and choose the mode a plain open lands on
 
-![The module switches in Settings](.agents/docs/assets/settings-modules.png)
+![The module switches in Settings](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/settings-modules.png)
 
 ## Side question
 
 Type `?` or `？` and the question, then press Enter. The answer streams into the list and uses the same Markdown renderer as the session panel, so tables, task lists, math and code highlighting match the main conversation.
 
-![Side-question detail: the answer streams into the list](.agents/docs/assets/side-question.png)
+![Side-question detail: the answer streams into the list](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/side-question.png)
 
 - While the main session runs, the question carries the current step and its generating text; when idle it carries the persisted history
 - The model defaults to the current session model at the lowest reasoning effort; both can be fixed in Settings
@@ -90,7 +90,7 @@ Apart from the model request a side question makes, the plugin sends nothing.
 
 ## Documentation
 
-Every project document is AI-generated and lives under `.agents/docs/`: the full behavior reference is the [usage guide](.agents/docs/使用指南.en.md), the module API for other plugins is the [extension guide](.agents/docs/扩展指南.en.md), and each hard decision is recorded in the [ADR index](.agents/docs/adr/索引.md). The Chinese versions are the [usage guide](.agents/docs/使用指南.md) and the [extension guide](.agents/docs/扩展指南.md), and [README.md](README.md) is the Chinese copy of this page.
+Every project document is AI-generated and lives under `.agents/docs/`: the full behavior reference is the [usage guide](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.en.md), the module API for other plugins is the [extension guide](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.en.md), and each hard decision is recorded in the [ADR index](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/adr/索引.md). The Chinese versions are the [usage guide](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.md) and the [extension guide](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.md), and [README.md](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.md) is the Chinese copy of this page.
 
 ## License
 

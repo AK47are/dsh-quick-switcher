@@ -220,21 +220,34 @@ test("the real client manifest registers every module and its contributions", as
     ["？", "ask"],
     ["﹖", "ask"],
     ["︖", "ask"],
+    ["why?", "ask-suffix"],
+    ["why？", "ask-suffix"],
+    ["why﹖", "ask-suffix"],
+    ["why︖", "ask-suffix"],
+    ["@why?", "files"],
+    ["!why?", "history"],
+    [">why?", "commands"],
+    ["#why?", "panels"],
+    ["+why?", "workspaces"],
+    ["?why?", "ask"],
   ];
   for (const [query, matcherId] of claims) {
     assert.equal(mounted.resolve(query).matcherId, matcherId, `query ${JSON.stringify(query)}`);
   }
-  // The compatibility mark is stripped like the ASCII one: the question text
-  // reaches the view, and the row is the ask row rather than a filter.
+  // The compatible mark is stripped at either end: the question text reaches
+  // the view, and the row is the ask row rather than a filter.
   assert.equal(mounted.resolve("？问题").view.rows[0].key, "a:q");
+  const suffixed = mounted.resolve("问题？");
+  assert.equal(suffixed.matcherId, "ask-suffix");
+  assert.equal(suffixed.mode, "ask");
+  assert.equal(suffixed.view.rows[0].key, "a:q");
+  assert.equal(mounted.resolve("?why?").mode, "ask");
   for (const module of harness.registry.modules()) {
     if (module.entry === null) continue;
     const expected = module.entry.mode ?? module.id;
-    assert.equal(
-      mounted.resolve(module.entry.seed).matcherId,
-      expected,
-      `entry of ${module.id} reaches its own mode`,
-    );
+    const resolved = mounted.resolve(module.entry.seed);
+    assert.equal(resolved.matcherId, expected, `entry of ${module.id} reaches its own mode`);
+    assert.equal(resolved.mode, expected, `entry of ${module.id} publishes its own mode`);
   }
   const sessionsCommand = harness.calls.commands
     .flatMap((entry) => entry.list)

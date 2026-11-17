@@ -4,6 +4,7 @@ import { buildPendingContext } from "../src/modules/ask/context.js";
 import {
   ASK_COPY_FEEDBACK_MS,
   ASK_TRIGGERS,
+  askSuffixOf,
   askTriggerOf,
   createAskActions,
   createAskUi,
@@ -281,10 +282,18 @@ test("the trigger set is every spelling whose NFKC form is a question mark", () 
   }
   assert.equal(askTriggerOf("？why"), "？");
   assert.equal(askTriggerOf("︖why"), "︖");
-  // The mark is a prefix: text that merely contains one is not a trigger.
+  // The leading mark is a prefix; the trailing spelling has its own helper.
   assert.equal(askTriggerOf("why？"), null);
   assert.equal(askTriggerOf(""), null);
   assert.equal(askTriggerOf(null), null);
+
+  assert.equal(askSuffixOf("why？"), "？");
+  assert.equal(askSuffixOf("why﹖"), "﹖");
+  // Only the last character counts, and a suffix is not an infix.
+  assert.equal(askSuffixOf("why? "), null);
+  assert.equal(askSuffixOf("?why"), null);
+  assert.equal(askSuffixOf(""), null);
+  assert.equal(askSuffixOf(null), null);
 });
 
 test("?text puts the ask row first and sends the whole text", () => {
@@ -324,6 +333,43 @@ test("a question asked with a compatibility mark keeps that mark", () => {
   assert.deepEqual(panel.queries, ["？hello"]);
   // The stored question never carries the mode prefix; the query keeps the mark.
   assert.equal(store.calls[0].question, "hello");
+});
+
+test("a question asked with a trailing mark keeps it at the end", () => {
+  const store = fakeStore();
+  const { view } = askViewOf({ store });
+  const panel = panelOf({ query: "hello？" });
+  const result = view.view({ text: "hello" }, panel);
+
+  result.rows[0].run();
+  assert.deepEqual(panel.queries, ["hello？"]);
+  // The stored question never carries the mode mark; the suffix stays where
+  // the user typed it, not rewritten into a leading halfwidth mark.
+  assert.equal(store.calls[0].question, "hello");
+
+  const detail = view.view({ text: "hello" }, panel);
+  assert.deepEqual(detail.content, { kind: "ask", props: { id: "r1" } });
+});
+
+test("opening a history row from a suffix query keeps the mark at the end", () => {
+  const store = fakeStore([record("r1", { question: "why?" })]);
+  const { view } = askViewOf({ store });
+  const panel = panelOf({ query: "hello?" });
+  const list = view.view({ text: "hello" }, panel);
+
+  list.rows[1].run();
+  // The last question mark is the mode mark; the one in the record stays text.
+  assert.deepEqual(panel.queries, ["why??"]);
+});
+
+test("a leading mark wins over a trailing one when rebuilding the query", () => {
+  const store = fakeStore([record("r1", { question: "why?" })]);
+  const { view } = askViewOf({ store });
+  const panel = panelOf({ query: "?hello?" });
+  const list = view.view({ text: "hello?" }, panel);
+
+  list.rows[1].run();
+  assert.deepEqual(panel.queries, ["?why?"]);
 });
 
 test("the ask row carries the pending interaction as read-only background", () => {

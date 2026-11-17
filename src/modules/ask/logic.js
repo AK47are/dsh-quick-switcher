@@ -35,12 +35,26 @@ export const ASK_TRIGGERS = Object.freeze([
 
 /**
  * The trigger a query starts with, or null when it starts with anything else.
- * Only the first character is considered: the mark is a mode prefix, not a
- * suffix or an infix.
+ * Only the first character is considered here; the trailing spelling is a
+ * separate mode entry, see askSuffixOf.
  */
 export function askTriggerOf(query) {
   if (typeof query !== "string" || query === "") return null;
   return ASK_TRIGGERS.find((trigger) => query.startsWith(trigger)) ?? null;
+}
+
+/**
+ * The trigger a query ends with, or null when it ends with anything else.
+ *
+ * The suffix form lets a question be typed the way it is written, with its own
+ * mark at the end. Only the last character counts: a trailing space closes the
+ * mode again, and the caller still has to decide whether a prefix already
+ * claimed the query. Exactly one mark is consumed; repeating it keeps the
+ * previous one as question text.
+ */
+export function askSuffixOf(query) {
+  if (typeof query !== "string" || query === "") return null;
+  return ASK_TRIGGERS.find((trigger) => query.endsWith(trigger)) ?? null;
 }
 
 /**
@@ -788,10 +802,11 @@ export function createAskActions({ api, store, ui, panel, back }) {
 /**
  * Build the "?" view for one panel mount.
  *
- * The query text after `?` is the question, never a filter: a side question is
- * one sentence the user wants answered, and matching history against it would
- * only ever hide the row they need. `?` alone lists the current session's
- * records, which is also where a half-finished answer can be reopened.
+ * The text after a leading trigger, or before a trailing one, is the question,
+ * never a filter: a side question is one sentence the user wants answered, and
+ * matching history against it would only ever hide the row they need. A bare
+ * trigger lists the current session's records, which is also where a
+ * half-finished answer can be reopened.
  *
  * The view owns one piece of navigation state, `detailId`. It survives a query
  * change so a stream that lands while the detail is open keeps updating in
@@ -819,14 +834,30 @@ export function createAskView({ api, store, ui, actions }) {
   }
 
   /**
-   * The trigger the input currently starts with.
+   * The trigger the input currently carries and the end it sits on.
    *
    * The locked input is re-seeded from the row's own text, so it keeps the mark
-   * the user actually typed; a question typed after `？` was never halfwidth.
-   * The fallback covers tests and a query that has not resolved to ask yet.
+   * the user actually typed and its position: a question typed after `？` was
+   * never halfwidth, and a question ended with `?` was never a prefix. The
+   * fallback covers tests and a query that has not resolved to ask yet.
    */
-  function triggerOf(panel) {
-    return askTriggerOf(panel.query) ?? "?";
+  function markOf(panel) {
+    const prefix = askTriggerOf(panel.query);
+    if (prefix !== null) return { mark: prefix, isSuffix: false };
+    const suffix = askSuffixOf(panel.query);
+    if (suffix !== null) return { mark: suffix, isSuffix: true };
+    return { mark: "?", isSuffix: false };
+  }
+
+  /**
+   * Rebuild the query from a question, keeping the mark where the user put it.
+   *
+   * A suffix mark stays at the end, so returning from the detail shows the same
+   * form that was typed; a prefix mark stays in front, as before.
+   */
+  function queryFor(text, panel) {
+    const { mark, isSuffix } = markOf(panel);
+    return isSuffix ? `${text}${mark}` : `${mark}${text}`;
   }
 
   /**
@@ -848,7 +879,7 @@ export function createAskView({ api, store, ui, actions }) {
         // makes the detail render even if that announcement is ever flushed
         // before `detailId` was assigned.
         panel.notify();
-        panel.setQuery(`${triggerOf(panel)}${record.question}`);
+        panel.setQuery(queryFor(record.question, panel));
       },
     };
   }
@@ -929,7 +960,7 @@ export function createAskView({ api, store, ui, actions }) {
                 // request makes the detail render even if that announcement is
                 // ever flushed before `detailId` was assigned.
                 panel.notify();
-                panel.setQuery(`${triggerOf(panel)}${text}`);
+                panel.setQuery(queryFor(text, panel));
               },
       });
     }

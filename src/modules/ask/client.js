@@ -1,6 +1,6 @@
 /* Ask module: the "?" side question, its records, and the detail view. */
 
-import { defineModule, prefixMatcher } from "../../core/module.js";
+import { defineModule, prefixMatcher, suffixMatcher } from "../../core/module.js";
 import { AskDetail, AskFooter } from "./detail.js";
 import { locale } from "./locale.js";
 import { ASK_TRIGGERS, createAskActions, createAskStore, createAskUi, createAskView } from "./logic.js";
@@ -83,11 +83,23 @@ export default defineModule("ask", (api) => {
         ui,
         actions,
         matchers: [
-          // Every compatibility spelling of "?" claims the mode; the view keeps
-          // whichever one the user typed in the locked question field.
+          // Every compatibility spelling of "?" claims the mode at either end.
+          // The prefix form is the explicit trigger and wins on a leading mark;
+          // the suffix form sits below every trigger (10) and above the
+          // catch-all list (-1000), so `@file?` still belongs to the files mode.
+          // Both publish the same mode so the mode command treats them as one
+          // surface instead of two.
           prefixMatcher(ASK_TRIGGERS, {
             id: "ask",
             priority: 10,
+            mode: "ask",
+            map: (text) => ({ text }),
+            view: view.view,
+          }),
+          suffixMatcher(ASK_TRIGGERS, {
+            id: "ask-suffix",
+            priority: 5,
+            mode: "ask",
             map: (text) => ({ text }),
             view: view.view,
           }),

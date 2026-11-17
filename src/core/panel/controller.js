@@ -4,8 +4,9 @@
  * A snapshot carries the seed the panel should start with and a generation that
  * changes on every open request, so a command fired while the panel is already
  * open reseeds the query in place instead of remounting the surface. `mode` is
- * the matcher id the shell resolved on the last render; commands read it to
- * decide whether the panel is already in their mode.
+ * the mode id the shell resolved on the last render, which is a matcher's
+ * declared mode alias or the matcher id; commands read it to decide whether the
+ * panel is already in their mode.
  */
 
 export function createPanelController() {

@@ -268,11 +268,17 @@ test("a mount keeps providers, matchers and dispose and rejects bad shapes", () 
   const view = () => viewOf();
   const surface = validateMount("alpha", {
     providers: [() => null],
-    matchers: [{ id: "alpha", priority: 2, match, view }],
+    matchers: [
+      { id: "alpha", priority: 2, match, view },
+      { id: "alpha-suffix", priority: 1, mode: "alpha", match, view },
+    ],
     dispose() {},
   });
   assert.equal(surface.providers.length, 1);
   assert.equal(surface.matchers[0].priority, 2);
+  assert.equal(surface.matchers[0].mode, "alpha");
+  assert.equal(surface.matchers[1].id, "alpha-suffix");
+  assert.equal(surface.matchers[1].mode, "alpha");
   assert.equal(typeof surface.dispose, "function");
 
   assert.deepEqual(validateMount("alpha", undefined), {
@@ -289,6 +295,14 @@ test("a mount keeps providers, matchers and dispose and rejects bad shapes", () 
   assert.throws(
     () => validateMount("alpha", { matchers: [{ id: "a", match, view, priority: "high" }] }),
     /priority/,
+  );
+  assert.throws(
+    () => validateMount("alpha", { matchers: [{ id: "a", match, view, mode: "Bad" }] }),
+    /mode/,
+  );
+  assert.throws(
+    () => validateMount("alpha", { matchers: [{ id: "a", match, view, mode: "" }] }),
+    /mode/,
   );
   assert.throws(() => validateMount("alpha", { dispose: 1 }), /dispose/);
 });

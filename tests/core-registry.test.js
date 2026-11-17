@@ -277,6 +277,42 @@ test("the first matcher that claims the query wins by priority, module order, th
   assert.equal(declared.resolve("zip").matcherId, "first");
 });
 
+test("a matcher publishes a shared mode and a suffix stays below every prefix", () => {
+  const { registry } = createHarness();
+  registerModule(registry, "ask", {
+    order: 10,
+    matchers: [
+      claims("ask", "?", 10),
+      {
+        id: "ask-suffix",
+        priority: 5,
+        mode: "ask",
+        match: (query) => (query.endsWith("?") ? { text: query.slice(0, -1) } : null),
+        view: (state) => ({ rows: [{ key: `ask:${state.text}`, title: state.text }] }),
+      },
+    ],
+  });
+  registerModule(registry, "files", {
+    order: 20,
+    matchers: [claims("files", "@", 10)],
+  });
+  const mounted = registry.mount(panelOf());
+
+  const prefixed = mounted.resolve("?why");
+  assert.equal(prefixed.matcherId, "ask");
+  assert.equal(prefixed.mode, "ask");
+
+  const suffixed = mounted.resolve("why?");
+  assert.equal(suffixed.matcherId, "ask-suffix");
+  assert.equal(suffixed.mode, "ask");
+  assert.equal(suffixed.view.rows[0].title, "why");
+
+  // An explicit prefix wins over the trailing mark; the suffix matcher only
+  // sees the query when no prefix owner claimed it.
+  assert.equal(mounted.resolve("@why?").matcherId, "files");
+  assert.equal(mounted.resolve("?why?").matcherId, "ask");
+});
+
 test("a null matcher falls through and an empty query reaches the default view", () => {
   const { registry } = createHarness();
   registerModule(registry, "alpha", {
@@ -292,6 +328,7 @@ test("a null matcher falls through and an empty query reaches the default view",
   const mounted = registry.mount(panelOf());
   const fallback = mounted.resolve("");
   assert.equal(fallback.matcherId, null);
+  assert.equal(fallback.mode, null);
   assert.equal(fallback.view.placeholder, "core:corePlaceholder");
   assert.equal(fallback.view.hints[0].label, "core:hintClose");
   assert.equal(mounted.resolve("b").matcherId, "only-b");

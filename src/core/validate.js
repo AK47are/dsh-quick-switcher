@@ -380,7 +380,20 @@ export function validateMount(moduleId, surface) {
     if (typeof priority !== "number" || !Number.isFinite(priority)) {
       fail(moduleId, `matcher "${matcher.id}" priority must be a finite number`);
     }
-    return { id: matcher.id, priority, match: matcher.match, view: matcher.view };
+    // Several matchers may publish one mode, so this id is validated as a mode
+    // id rather than required to match the matcher id. A missing alias means
+    // the matcher's own id, which keeps every existing matcher unchanged.
+    const mode = optionalString(moduleId, matcher.mode, `matcher "${matcher.id}" mode`);
+    if (mode !== undefined && !ID_PATTERN.test(mode)) {
+      fail(moduleId, `matcher "${matcher.id}" mode ${JSON.stringify(mode)} is invalid`);
+    }
+    return {
+      id: matcher.id,
+      priority,
+      mode: mode ?? matcher.id,
+      match: matcher.match,
+      view: matcher.view,
+    };
   });
 
   const dispose = surface.dispose;

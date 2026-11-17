@@ -54,15 +54,17 @@ export function defineModule(id, setup) {
  * query that starts with ">" and hands the rest to the view as `{ filter }`.
  * Pass an array to accept several triggers: the first entry that matches in
  * array order wins, and the rest of the query is handed on as before. Pass
- * `map` for a different state shape, and `priority` when another module can
- * claim the same query. A matcher built here is a plain object, so a module
- * may still write `match` by hand for suffix, regex or stateful triggers.
+ * `map` for a different state shape, `priority` when another module can claim
+ * the same query, and `mode` when several matchers implement one mode. A
+ * matcher built here is a plain object, so a module may still write `match` by
+ * hand for regex or stateful triggers; `suffixMatcher` covers trailing ones.
  *
  * @param {string | readonly string[]} prefix
  * @param {{
  *   id: string,
  *   view: (state: unknown, panel: PanelContext) => PanelView,
  *   priority?: number,
+ *   mode?: string,
  *   map?: (text: string, panel: PanelContext) => unknown,
  * }} options
  * @returns {Matcher}
@@ -81,7 +83,7 @@ export function prefixMatcher(prefix, options) {
   // Copy the triggers so a caller mutating its array cannot change the matcher
   // after the registry has already sorted it.
   const prefixes = [...candidates];
-  const { id, view, priority = 0, map } = options ?? {};
+  const { id, view, priority = 0, mode, map } = options ?? {};
   if (typeof id !== "string" || id === "") {
     throw new TypeError("dsh-quick-switcher: prefixMatcher needs a matcher id");
   }
@@ -95,11 +97,76 @@ export function prefixMatcher(prefix, options) {
   return {
     id,
     priority,
+    mode,
     match(query, panel) {
       if (typeof query !== "string") return null;
       const hit = prefixes.find((item) => query.startsWith(item));
       if (hit === undefined) return null;
       return stateOf(query.slice(hit.length), panel);
+    },
+    view,
+  };
+}
+
+/**
+ * Build a matcher from a trailing trigger.
+ *
+ * `suffixMatcher("?", { id, view })` claims every query that ends with "?" and
+ * hands the text before the mark to the view as `{ filter }`. Pass an array to
+ * accept several triggers: the first entry that matches in array order wins,
+ * and the mark is consumed, so the state never contains it. The matcher is a
+ * plain object, like the one `prefixMatcher` returns, and its `mode` may name
+ * the same mode as another matcher so commands still see one mode.
+ *
+ * A suffix matcher must be given a lower priority than the prefix matchers
+ * that own the same query language: the registry resolves by priority first,
+ * so an explicit prefix keeps winning over a trailing mark.
+ *
+ * @param {string | readonly string[]} suffix
+ * @param {{
+ *   id: string,
+ *   view: (state: unknown, panel: PanelContext) => PanelView,
+ *   priority?: number,
+ *   mode?: string,
+ *   map?: (text: string, panel: PanelContext) => unknown,
+ * }} options
+ * @returns {Matcher}
+ */
+export function suffixMatcher(suffix, options) {
+  const candidates = typeof suffix === "string" ? [suffix] : suffix;
+  if (
+    !Array.isArray(candidates) ||
+    candidates.length === 0 ||
+    candidates.some((item) => typeof item !== "string")
+  ) {
+    throw new TypeError(
+      "dsh-quick-switcher: suffixMatcher needs a string suffix or a non-empty array of string suffixes",
+    );
+  }
+  // Copy the triggers for the same reason as prefixMatcher: the registry sorts
+  // the matcher once and a later mutation of the caller's array must not change
+  // what a settled query resolves to.
+  const suffixes = [...candidates];
+  const { id, view, priority = 0, mode, map } = options ?? {};
+  if (typeof id !== "string" || id === "") {
+    throw new TypeError("dsh-quick-switcher: suffixMatcher needs a matcher id");
+  }
+  if (typeof view !== "function") {
+    throw new TypeError(`dsh-quick-switcher: suffixMatcher "${id}" needs a view function`);
+  }
+  if (map !== undefined && typeof map !== "function") {
+    throw new TypeError(`dsh-quick-switcher: suffixMatcher "${id}" map must be a function`);
+  }
+  const stateOf = map ?? ((text) => ({ filter: text }));
+  return {
+    id,
+    priority,
+    mode,
+    match(query, panel) {
+      if (typeof query !== "string") return null;
+      const hit = suffixes.find((item) => query.endsWith(item));
+      if (hit === undefined) return null;
+      return stateOf(query.slice(0, query.length - hit.length), panel);
     },
     view,
   };
@@ -174,7 +241,7 @@ export function prefixMatcher(prefix, options) {
  * How the core opens this module's mode directly.
  *
  * The seed is typed into the panel input, so it must resolve back to this
- * module's matcher when every module is mounted. `mode` names the matcher the
+ * module's matcher when every module is mounted. `mode` names the mode the
  * command compares against to decide whether the panel already shows this
  * mode; it defaults to the module id. The core registers one DSH command per
  * entry with the id `quickSwitcher.mode.<module id>`, a label prefixed with the
@@ -184,7 +251,7 @@ export function prefixMatcher(prefix, options) {
  *
  * @typedef {object} ModuleEntry
  * @property {string} seed query pre-filled when the command opens the panel
- * @property {string} [mode] matcher id to compare against the open panel
+ * @property {string} [mode] mode id to compare against the open panel
  * @property {string} [labelKey] mode name shown in the command label and default-mode options
  * @property {string[]} [aliases] extra search words for the shortcut editor
  * @property {Record<string, object>} [defaults] key specs keyed by `runtime:platform`
@@ -203,8 +270,9 @@ export function prefixMatcher(prefix, options) {
 
 /**
  * @typedef {object} Matcher
- * @property {string} id globally unique, also the mode id published to the controller
+ * @property {string} id globally unique, also the default mode id published to the controller
  * @property {number} [priority] higher claims first, default 0
+ * @property {string} [mode] mode id published instead of id, for matchers that share one mode
  * @property {(query: string, panel: PanelContext) => unknown} match null declines
  * @property {(state: unknown, panel: PanelContext) => PanelView} view
  */

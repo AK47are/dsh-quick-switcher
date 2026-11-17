@@ -1,6 +1,6 @@
 /* Re-export the public module contract for code inside the bundle. */
 
-export { API_VERSION, defineModule, prefixMatcher } from "../../module.js";
+export { API_VERSION, defineModule, prefixMatcher, suffixMatcher } from "../../module.js";
 
 /**
  * Whether a value is the shape the registry accepts. `defineModule` produces

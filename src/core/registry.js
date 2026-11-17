@@ -124,8 +124,8 @@ export function createRegistry(deps = {}) {
    * The command is an ordinary DSH app command: it appears in the shortcut
    * editor and in the command list, and its resolve uses the mode the open
    * panel publishes to decide between opening, switching and closing. `mode`
-   * names the matcher id rather than the module id because an external module
-   * may own several matchers.
+   * names the published mode id rather than the module id because an external
+   * module may own several matchers, and several matchers may share one mode.
    */
   function entryCommandOf(record) {
     const entry = record.spec.entry;
@@ -466,6 +466,7 @@ export function createRegistry(deps = {}) {
             declaration: declaration++,
             id: matcher.id,
             priority: matcher.priority,
+            mode: matcher.mode,
             match: matcher.match,
             view: matcher.view,
             record,
@@ -543,12 +544,15 @@ export function createRegistry(deps = {}) {
             view: validateView(matcher.moduleId, matcher.id, view),
             moduleId: matcher.moduleId,
             matcherId: matcher.id,
+            // The controller publishes a mode, not a matcher: several matchers
+            // may declare the same mode for their different spellings.
+            mode: matcher.mode,
           };
         } catch (error) {
           report(matcher.record, matcher, "view shape", error);
         }
       }
-      return { view: defaultView(), moduleId: null, matcherId: null };
+      return { view: defaultView(), moduleId: null, matcherId: null, mode: null };
     }
 
     function providers() {

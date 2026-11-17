@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { API_VERSION, defineModule, prefixMatcher } from "../module.js";
+import { API_VERSION, defineModule, prefixMatcher, suffixMatcher } from "../module.js";
 import { isModuleDefinition } from "../src/core/module.js";
 
 test("defineModule keeps the id and setup and freezes the definition", () => {
@@ -54,6 +54,9 @@ test("prefixMatcher claims a leading trigger and maps the rest", () => {
     sessionId: "s1",
   });
   assert.equal(mapped.priority, 0);
+
+  const shared = prefixMatcher(":", { id: "my-mode", mode: "shared", view });
+  assert.equal(shared.mode, "shared");
 });
 
 test("prefixMatcher accepts several triggers and the first one wins", () => {
@@ -92,4 +95,53 @@ test("prefixMatcher rejects a missing or malformed option", () => {
   assert.throws(() => prefixMatcher(">", { view() {} }), /matcher id/);
   assert.throws(() => prefixMatcher(">", { id: "a" }), /view/);
   assert.throws(() => prefixMatcher(">", { id: "a", view() {}, map: 1 }), /map/);
+});
+
+test("suffixMatcher claims a trailing trigger and maps the text before it", () => {
+  const view = () => ({ rows: [] });
+  const matcher = suffixMatcher("?", { id: "ask-suffix", priority: 5, mode: "ask", view });
+  assert.equal(matcher.id, "ask-suffix");
+  assert.equal(matcher.priority, 5);
+  assert.equal(matcher.mode, "ask");
+  assert.equal(matcher.view, view);
+  assert.deepEqual(matcher.match("why?", {}), { filter: "why" });
+  assert.deepEqual(matcher.match("?", {}), { filter: "" });
+  assert.equal(matcher.match("?why", {}), null);
+  assert.equal(matcher.match("why? ", {}), null);
+  assert.equal(matcher.match(null, {}), null);
+
+  const mapped = suffixMatcher(["？", "?"], {
+    id: "ask-suffix",
+    map: (text, panel) => ({ text, sessionId: panel.currentSessionId }),
+    view,
+  });
+  assert.deepEqual(mapped.match("why？", { currentSessionId: "s1" }), {
+    text: "why",
+    sessionId: "s1",
+  });
+  assert.equal(mapped.priority, 0);
+  assert.equal(mapped.mode, undefined);
+});
+
+test("suffixMatcher accepts several triggers and the first one wins", () => {
+  const view = () => ({ rows: [] });
+  const matcher = suffixMatcher(["?", "？"], { id: "ask-suffix", view });
+  assert.deepEqual(matcher.match("why?", {}), { filter: "why" });
+  assert.deepEqual(matcher.match("why？", {}), { filter: "why" });
+  assert.equal(matcher.match("？why", {}), null);
+
+  // Array order, not length, decides which overlapping suffix claims the
+  // query; the text keeps the characters before the first mark.
+  const ordered = suffixMatcher(["?", "??"], { id: "ask-suffix", view });
+  assert.deepEqual(ordered.match("why??", {}), { filter: "why?" });
+});
+
+test("suffixMatcher rejects a missing or malformed option", () => {
+  assert.throws(() => suffixMatcher(1, { id: "a", view() {} }), /string suffix/);
+  assert.throws(() => suffixMatcher([], { id: "a", view() {} }), /string suffixes/);
+  assert.throws(() => suffixMatcher(["?", null], { id: "a", view() {} }), /string suffixes/);
+  assert.throws(() => suffixMatcher([1], { id: "a", view() {} }), /string suffixes/);
+  assert.throws(() => suffixMatcher("?", { view() {} }), /matcher id/);
+  assert.throws(() => suffixMatcher("?", { id: "a" }), /view/);
+  assert.throws(() => suffixMatcher("?", { id: "a", view() {}, map: 1 }), /map/);
 });

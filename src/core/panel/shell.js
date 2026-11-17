@@ -183,10 +183,12 @@ export function SwitcherShell({
   };
 
   // Commands ask the controller which mode the panel shows; the shell is the
-  // only place that knows what the current query resolved to.
+  // only place that knows what the current query resolved to. The published id
+  // is the matcher's mode alias, so two spellings of one mode keep the same
+  // command behavior.
   React.useEffect(() => {
-    controller.setMode(resolved.matcherId);
-  }, [controller, resolved.matcherId]);
+    controller.setMode(resolved.mode);
+  }, [controller, resolved.mode]);
 
   // The public snapshot carries the edited query; a command can use it to decide
   // whether the panel is already showing the mode it wants.

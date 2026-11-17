@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Quick switcher",
+    "zh": "快速切换器"
+  },
+  "description": {
+    "en": "Community plugin index for dsh-quick-switcher.",
+    "zh": "dsh-quick-switcher 的插件索引。"
+  },
+  "metadata": {
+    "categories": {
+      "ui": {
+        "title": {
+          "en": "Interface",
+          "zh": "界面"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-quick-switcher",
+      "title": {
+        "en": "Quick switcher",
+        "zh": "快速切换器"
+      },
+      "description": {
+        "en": "One search surface for sessions, workspaces, commands, input history, main panels, workspace files, and a side question that never enters the main conversation.",
+        "zh": "统一搜索入口：切换会话、浏览工作区、运行命令、回填输入历史、跳到主面板、搜索文件，还能就当前会话侧问。"
+      },
+      "icon": "../icon.svg",
+      "author": "AK47are",
+      "homepage": "https://github.com/AK47are/dsh-quick-switcher#readme",
+      "repository": {
+        "url": "https://github.com/AK47are/dsh-quick-switcher"
+      },
+      "metadata": {
+        "category": "ui",
+        "keywords": [
+          "search",
+          "session",
+          "command palette"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.5.0",
+          "publishTimestamp": 1794880342,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-0"
+          }
+        }
+      ]
+    }
+  ]
+}

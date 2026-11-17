@@ -1,18 +1,45 @@
 {
   "name": "dsh-quick-switcher",
   "version": "1.5.0",
-  "private": true,
+  "private": false,
   "type": "module",
+  "description": "One search surface for DeepSeek Harness Web: switch sessions, browse workspaces, run commands, refill input history, jump to main panels, open workspace files, and ask a side question that never enters the main conversation.",
+  "license": "MIT",
+  "author": "AK47are <54732151+AK47are@users.noreply.github.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AK47are/dsh-quick-switcher.git"
+  },
+  "homepage": "https://github.com/AK47are/dsh-quick-switcher#readme",
+  "bugs": {
+    "url": "https://github.com/AK47are/dsh-quick-switcher/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "deepseek",
+    "plugin",
+    "quick-switcher",
+    "command-palette",
+    "search",
+    "session"
+  ],
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.2-0"
+  },
   "scripts": {
     "build": "node scripts/build.js",
     "check": "node scripts/build.js --check",
     "prepare": "node scripts/build.js",
-    "test": "node --test tests"
+    "test": "node --test tests",
+    "market": "node scripts/market-index.js",
+    "market:check": "node scripts/market-index.js --check"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-plugin-market-index": "0.2.1-alpha.4",
     "esbuild": "0.28.2"
   },
-  "description": "快速切换器：统一搜索入口，切换会话、浏览工作区、运行应用命令、回填输入历史、跳到主面板、搜索工作区文件，并可就当前会话侧问一个不进入主对话的问题；模块可随时开关，快捷键可直达每个模式，侧问携带完整工具轨迹与运行中的现场，模型与推理等级可调，触发符可出现在开头或结尾，接受全角与兼容问号，图片与文件可关。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -29,6 +56,7 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
+    "market/index.json",
     "README.md"
   ],
   "dsh": {

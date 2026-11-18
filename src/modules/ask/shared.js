@@ -9,6 +9,7 @@ export const UNLOADED_MESSAGE = "dsh-quick-switcher was unloaded";
 export const ASK_EVENTS = Object.freeze({
   start: "start",
   delta: "delta",
+  reasoning: "reasoning",
   usage: "usage",
   finish: "finish",
   done: "done",

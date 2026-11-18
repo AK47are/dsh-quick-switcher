@@ -160,10 +160,51 @@ test("a dropped connection becomes an error, not a silent finish", async () => {
   assert.equal(settled.error, "askDisconnected");
 });
 
+test("reasoning streams into the record and survives a stop", async () => {
+  const store = createAskStore({
+    request: async () =>
+      responseOf(
+        heldStream(
+          sse(
+            { type: "start", atSeq: 1, model: "m" },
+            { type: "reasoning", text: "think " },
+            { type: "reasoning", text: "again" },
+            { type: "delta", text: "ans" },
+          ),
+        ),
+      ),
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q");
+  await flush();
+  const running = store.find(record.id);
+  assert.equal(running.reasoning, "think again");
+  assert.equal(running.answer, "ans");
+
+  assert.equal(store.stop("s1", record.id), true);
+  assert.equal(store.find(record.id).reasoning, "think again");
+  await flush();
+});
+
 test("regenerating clears the answer and asks the same question again", async () => {
   const streams = [
-    heldStream(sse({ type: "start", atSeq: 0 }, { type: "delta", text: "old" }, { type: "done" })),
-    heldStream(sse({ type: "start", atSeq: 0 }, { type: "delta", text: "new" }, { type: "done" })),
+    heldStream(
+      sse(
+        { type: "start", atSeq: 0 },
+        { type: "reasoning", text: "old think" },
+        { type: "delta", text: "old" },
+        { type: "done" },
+      ),
+    ),
+    heldStream(
+      sse(
+        { type: "start", atSeq: 0 },
+        { type: "reasoning", text: "new think" },
+        { type: "delta", text: "new" },
+        { type: "done" },
+      ),
+    ),
   ];
   const seen = [];
   const store = createAskStore({
@@ -177,12 +218,15 @@ test("regenerating clears the answer and asks the same question again", async ()
   const record = store.ask("s1", "q");
   await flush();
   assert.equal(store.find(record.id).answer, "old");
+  assert.equal(store.find(record.id).reasoning, "old think");
 
   assert.equal(store.regenerate("s1", record.id), true);
   assert.equal(store.find(record.id).answer, "");
+  assert.equal(store.find(record.id).reasoning, "");
   await flush();
 
   assert.equal(store.find(record.id).answer, "new");
+  assert.equal(store.find(record.id).reasoning, "new think");
   assert.equal(store.find(record.id).status, "done");
   assert.equal(seen.length, 2);
   assert.equal(seen[1].body.question, "q");
@@ -400,6 +444,7 @@ test("fork posts the question, visible answer, prefix, and background", async ()
         heldStream(
           sse(
             { type: "start", atSeq: 4, model: "m" },
+            { type: "reasoning", text: "thinking" },
             { type: "delta", text: "hi" },
             { type: "done" },
           ),
@@ -412,10 +457,12 @@ test("fork posts the question, visible answer, prefix, and background", async ()
   const record = store.ask("s1", "why?", { text: "background", label: "Approval" });
   await flush();
   assert.equal(canFork(store.find(record.id)), true);
+  assert.equal(store.find(record.id).reasoning, "thinking");
 
   const child = await store.fork("s1", record.id);
   assert.equal(child, "child");
   assert.equal(seen[1].path, FORK_PATH);
+  // Reasoning is a process, not part of the exchange the new session keeps.
   assert.deepEqual(seen[1].body, {
     sessionId: "s1",
     question: "why?",

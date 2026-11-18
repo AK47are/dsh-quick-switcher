@@ -56,11 +56,13 @@ Press Ctrl+Shift+K to open the panel, type to filter, move with the arrow keys, 
 
 ## Side question
 
-Type `?` or `？` and the question, then press Enter. The answer streams into the list and uses the same Markdown renderer as the session panel, so tables, task lists, math and code highlighting match the main conversation.
+Type `?` or `？` and the question, then press Enter. The answer streams into the list and uses the same Markdown renderer as the session panel, so tables, task lists, math and code highlighting match the main conversation. When the model returns reasoning, a collapsed thinking block appears above the answer, previewing the latest completed paragraph's first line and opening to the full reasoning.
 
 ![Side-question detail: the answer streams into the list](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/side-question.png)
 
 - While the main session runs, the question carries the current step and its generating text; when idle it carries the persisted history
+- The thinking block appears only when the model actually returns reasoning; the default lowest effort may be `off`, in which case there is nothing to show
+- Thinking never travels with copy or fork: `C` copies only the answer, and `F` writes only the question and answer into the new session
 - The model defaults to the current session model at the lowest reasoning effort; both can be fixed in Settings
 - Closing the panel aborts generation and keeps the received answer, marked as stopped
 - In the detail view, `i` returns to the list, `C` copies, `R` regenerates, `F` forks and `S` stops

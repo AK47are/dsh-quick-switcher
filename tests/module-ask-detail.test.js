@@ -62,6 +62,25 @@ function answerElement(tree) {
   return find(tree, (node) => node.type === "MarkdownText")[0] ?? null;
 }
 
+/** The reasoning disclosure row, or null when the record has none. */
+function thinkRow(tree) {
+  return find(tree, (node) => node.type === "DisclosureRow")[0] ?? null;
+}
+
+/** The plain summary the collapsed row shows beside its title. */
+function summaryOf(row) {
+  const shimmer = find(row?.props?.collapsedContent, (node) => node.type === "TextShimmer")[0];
+  return shimmer?.children?.[0] ?? null;
+}
+
+function waitingRow(tree) {
+  return find(tree, (node) => node.props?.className === "dqs-ask-waiting")[0] ?? null;
+}
+
+function hasWaitingPlaceholder(tree) {
+  return waitingRow(tree) !== null;
+}
+
 const ZH = {
   askCodeCopy: "复制",
   askCodeCopied: "已复制",
@@ -70,6 +89,9 @@ const ZH = {
   askCodeUnwrap: "取消换行",
   askFootnotes: "脚注",
   askStatusRunning: "运行中",
+  askWaiting: "正在分析请求…",
+  askThinkingTitle: "思考",
+  askEmptyAnswer: "没有返回内容",
   usageInput: "输入",
   usageOutput: "输出",
 };
@@ -82,6 +104,9 @@ const EN = {
   askCodeUnwrap: "Unwrap",
   askFootnotes: "Footnotes",
   askStatusRunning: "Running",
+  askWaiting: "Analyzing the request…",
+  askThinkingTitle: "Think",
+  askEmptyAnswer: "No content returned",
   usageInput: "input",
   usageOutput: "output",
 };
@@ -102,6 +127,7 @@ function makeRecord(overrides = {}) {
     sessionId: "session-1",
     question: "why",
     answer: "见 [示例](https://example.com)",
+    reasoning: "",
     context: "",
     contextLabel: "",
     model: "deepseek-chat",
@@ -177,11 +203,138 @@ test("the labels object is stable until the language changes", async () => {
   assert.equal(english.props.labels.footnotes, "Footnotes");
 });
 
-test("an empty running answer shows the thinking state instead of the renderer", async () => {
+test("an empty running answer shows the waiting state instead of the renderer", async () => {
   const detail = await loadDetail();
   const record = makeRecord({ answer: "" });
   const tree = render(detail, record, translateWith(ZH));
 
   assert.equal(answerElement(tree), null);
-  assert.ok(find(tree, (node) => node.props?.className === "dqs-ask-thinking").length > 0);
+  assert.ok(hasWaitingPlaceholder(tree));
+  // The copy names the request, not the model's thinking: the wait may be the
+  // network, and the chat panel uses the same label before its first token.
+  assert.ok(waitingRow(tree).children.includes("正在分析请求…"));
+  // The dot sits in a fixed leading slot so the label starts on the same x as
+  // the thinking row's title when the block replaces the wait.
+  assert.ok(
+    waitingRow(tree).children.some(
+      (child) => child?.props?.className === "dqs-ask-waiting-icon",
+    ),
+  );
+});
+
+test("a running record with reasoning shows a collapsed thinking row", async () => {
+  const detail = await loadDetail();
+  const record = makeRecord({
+    answer: "",
+    reasoning: "first thought\nsecond line",
+  });
+  const tree = render(detail, record, translateWith(ZH));
+  const row = thinkRow(tree);
+
+  assert.notEqual(row, null);
+  assert.equal(row.props.title, "思考");
+  assert.equal(row.props.open, false);
+  assert.equal(row.props.running, true);
+  assert.equal(row.props.expandOnRowClick, true);
+  assert.equal(summaryOf(row), "first thought");
+  assert.equal(answerElement(tree), null);
+  assert.equal(hasWaitingPlaceholder(tree), false);
+});
+
+test("a signature prefix hides reasoning until its visible text starts", async () => {
+  const detail = await loadDetail();
+  const t = translateWith(ZH);
+
+  const hidden = render(
+    detail,
+    makeRecord({ answer: "", reasoning: "<signature>" }),
+    t,
+  );
+  assert.equal(thinkRow(hidden), null);
+  assert.ok(hasWaitingPlaceholder(hidden));
+
+  const shown = render(
+    detail,
+    makeRecord({
+      answer: "",
+      reasoning: "<signature>opaque</signature>\nWhat the model thought",
+      status: "done",
+    }),
+    t,
+  );
+  assert.equal(summaryOf(thinkRow(shown)), "What the model thought");
+});
+
+test("the collapsed summary follows the latest completed paragraph while running", async () => {
+  const detail = await loadDetail();
+  const record = makeRecord({
+    answer: "",
+    reasoning: "para one\n\n**para two** opener\nstill arriving",
+  });
+
+  const row = thinkRow(render(detail, record, translateWith(ZH)));
+  // Bold markers are dropped because the row renders plain text, not Markdown.
+  assert.equal(summaryOf(row), "para two opener");
+});
+
+test("a settled record summarizes from the opening line", async () => {
+  const detail = await loadDetail();
+  const record = makeRecord({
+    answer: "answer",
+    reasoning: "para one\n\npara two\nstill",
+    status: "done",
+  });
+
+  const row = thinkRow(render(detail, record, translateWith(ZH)));
+  assert.equal(row.props.running, false);
+  assert.equal(summaryOf(row), "para one");
+});
+
+test("a finished record with reasoning keeps the block and the empty answer note", async () => {
+  const detail = await loadDetail();
+  const record = makeRecord({
+    answer: "",
+    reasoning: "thought",
+    status: "done",
+  });
+  const tree = render(detail, record, translateWith(ZH));
+
+  assert.notEqual(thinkRow(tree), null);
+  assert.equal(answerElement(tree), null);
+  assert.ok(
+    find(
+      tree,
+      (node) =>
+        node.props?.className === "dqs-ask-meta" && node.children?.[0] === "没有返回内容",
+    ).length > 0,
+  );
+});
+
+test("the thinking row follows the interface language", async () => {
+  const detail = await loadDetail();
+  const record = makeRecord({ answer: "", reasoning: "reasoning" });
+
+  const english = thinkRow(render(detail, record, translateWith(EN)));
+  assert.equal(english.props.title, "Think");
+});
+
+test("the expanded thinking body renders through the shared Markdown renderer", async () => {
+  const detail = await loadDetail();
+  const labels = { footnotes: "脚注", code: { copyLabel: "复制" } };
+  const tree = detail.AskThinkingBlock({
+    text: "first\nsecond **bold**",
+    running: true,
+    open: true,
+    onToggle: () => {},
+    t: translateWith(ZH),
+    labels,
+  });
+
+  const row = find(tree, (node) => node.type === "DisclosureRow")[0];
+  assert.equal(row.props.open, true);
+  const markdown = find(tree, (node) => node.type === "MarkdownText")[0];
+  assert.equal(markdown.props.text, "first\nsecond **bold**");
+  assert.equal(markdown.props.streaming, true);
+  assert.equal(markdown.props.variant, "compact");
+  assert.equal(markdown.props.labels, labels);
 });

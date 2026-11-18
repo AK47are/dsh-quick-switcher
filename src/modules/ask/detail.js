@@ -3,9 +3,20 @@
 import React from "react";
 import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
 import { formatUsage } from "../../core/lib/format.js";
-import { canCopy, canFork, canRegenerate, isRunning, statusLabelKey } from "./logic.js";
+import {
+  canCopy,
+  canFork,
+  canRegenerate,
+  displayReasoning,
+  isRunning,
+  reasoningSummary,
+  statusLabelKey,
+} from "./logic.js";
 
 const h = React.createElement;
+
+/** Stable think icon shared by every rendered block, like the chat row's. */
+const THINK_ICON = h(primitives.IconThinkOutlineRegular, { size: 14 });
 
 /** Stable no-op used while the mount surface is missing a subscription. */
 function noopSubscribe() {
@@ -117,6 +128,80 @@ function ActionButton({ label, keyLabel, shortcut, onClick, disabled }) {
 }
 
 /**
+ * The model's own reasoning for one record, collapsed until the reader opens it.
+ *
+ * The collapsed row mirrors the chat panel's reasoning row: a think icon, a
+ * fixed title, the latest completed paragraph's first line while streaming, and
+ * the opening line once settled. The body renders Markdown through the same
+ * primitive as the answer, so code blocks and math look the same in both
+ * places. The block sits outside the answer's live region: announcing every
+ * reasoning token would bury the answer a screen reader is waiting for.
+ *
+ * The expansion flag is a parameter rather than local state so the detail owns
+ * it: a new record remounts the detail, and the block starts collapsed again
+ * without carrying the previous record's choice.
+ */
+export function AskThinkingBlock({ text, running, open, onToggle, t, labels }) {
+  const summary = reasoningSummary(text, running);
+
+  const collapsedContent = h(
+    React.Fragment,
+    null,
+    h("span", {
+      className: "dqs-ask-think-separator",
+      "data-shimmer-decoration": true,
+      "aria-hidden": "true",
+    }),
+    h(
+      "span",
+      { className: "dqs-ask-think-summary", "data-streaming": running || undefined },
+      h(
+        "span",
+        { className: "dqs-ask-think-summaryText" },
+        h(primitives.TextShimmer, null, summary),
+      ),
+    ),
+  );
+
+  return h(
+    "div",
+    {
+      className: "dqs-ask-think",
+      "data-expanded": open || undefined,
+      "data-preview": summary !== "" || undefined,
+    },
+    h(
+      primitives.DisclosureRow,
+      {
+        rowClassName: "dqs-ask-think-row",
+        leadingClassName: "dqs-ask-think-leading",
+        titleClassName: "dqs-ask-think-title",
+        icon: THINK_ICON,
+        title: t("askThinkingTitle"),
+        running,
+        open,
+        expandable: true,
+        expandOnRowClick: true,
+        onToggle,
+        collapsedContent,
+      },
+      open
+        ? h(
+            "div",
+            { className: "dqs-ask-think-body" },
+            h(primitives.MarkdownText, {
+              text,
+              streaming: running,
+              labels,
+              variant: "compact",
+            }),
+          )
+        : null,
+    ),
+  );
+}
+
+/**
  * The answer for one record.
  *
  * The scroll container itself is focusable: after the panel sends a question
@@ -133,9 +218,13 @@ export function AskDetail({ descriptor, instance, t }) {
   const record = useAskRecord(instance, id);
   const answer = record === null ? "" : record.answer;
   const status = record === null ? "" : record.status;
+  // Reasoning arrives before, between, and after answer chunks; only the
+  // display form matters here, so a signature-only prefix counts as empty.
+  const reasoning = record === null ? "" : displayReasoning(record.reasoning);
 
   const scrollRef = React.useRef(null);
   const followRef = React.useRef(true);
+  const [thinkingOpen, setThinkingOpen] = React.useState(false);
   const labels = markdownLabels(t);
 
   React.useEffect(() => {
@@ -152,7 +241,7 @@ export function AskDetail({ descriptor, instance, t }) {
     const node = scrollRef.current;
     if (node === null || !followRef.current) return;
     node.scrollTop = node.scrollHeight;
-  }, [answer, status]);
+  }, [answer, reasoning, status]);
 
   if (record === null) return null;
 
@@ -189,12 +278,20 @@ export function AskDetail({ descriptor, instance, t }) {
   }
 
   let body = null;
-  if (running && answer === "") {
+  if (running && answer === "" && reasoning === "") {
+    // No content has arrived yet, so this must not claim the model is thinking:
+    // the wait may be the network, the host, or the provider's queue. The chat
+    // panel's own pre-first-token label is "analyzing the request", so the two
+    // surfaces name the same state the same way.
     body = h(
       "span",
-      { className: "dqs-ask-thinking" },
-      h("span", { className: "dqs-ask-dot", "aria-hidden": "true" }),
-      t("askThinking"),
+      { className: "dqs-ask-waiting" },
+      h(
+        "span",
+        { className: "dqs-ask-waiting-icon" },
+        h("span", { className: "dqs-ask-dot", "aria-hidden": "true" }),
+      ),
+      t("askWaiting"),
     );
   } else if (answer !== "") {
     // The session panel and a side question render answers with the same
@@ -231,6 +328,16 @@ export function AskDetail({ descriptor, instance, t }) {
           h("summary", null, `${t("askContextAttached")}${record.contextLabel}`),
           h("pre", null, record.context),
         ),
+    reasoning === ""
+      ? null
+      : AskThinkingBlock({
+          text: reasoning,
+          running,
+          open: thinkingOpen,
+          onToggle: () => setThinkingOpen((value) => !value),
+          t,
+          labels,
+        }),
     h(
       "div",
       {

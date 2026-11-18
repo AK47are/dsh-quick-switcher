@@ -111,6 +111,77 @@ export function statusLabelKey(record) {
 }
 
 /**
+ * Prepare complete or streaming reasoning for display.
+ *
+ * Some providers prefix reasoning with an encrypted `<signature>` block. It is
+ * protocol material, not text a reader can use, so it never reaches the block.
+ * While the opening tag is still streaming in there is nothing to show yet;
+ * once the closing tag arrives, the visible text starts after it and its
+ * leading line breaks. Plain reasoning passes through untouched.
+ */
+export function displayReasoning(text) {
+  if (typeof text !== "string" || text === "") return "";
+  if (text[0] !== "<") return text;
+  const opening = "<signature>";
+  const closing = "</signature>";
+  if (opening.startsWith(text)) return "";
+  if (!text.startsWith(opening)) return text;
+  const end = text.indexOf(closing, opening.length);
+  if (end === -1) return "";
+  let start = end + closing.length;
+  while (start < text.length) {
+    if (text[start] === "\n") start += 1;
+    else if (text[start] === "\r" && text[start + 1] === "\n") start += 2;
+    else break;
+  }
+  return text.slice(start);
+}
+
+/** The first line of a finished reasoning text, which is its best summary. */
+function firstLine(text) {
+  const newline = text.indexOf("\n");
+  return newline === -1 ? text : text.slice(0, newline);
+}
+
+/**
+ * The first line of the latest completed paragraph while reasoning streams.
+ *
+ * A fresh line has not finished arriving yet, so showing it would make the
+ * summary flicker with every token. Walking paragraph by paragraph keeps the
+ * last settled opener on screen until the next paragraph breaks.
+ */
+function latestCompletedParagraphFirstLine(text) {
+  let summary = "";
+  let paragraphStart = 0;
+  const separator = /\r?\n(?:[\t ]*\r?\n)+/g;
+  for (;;) {
+    const nextParagraph = separator.exec(text);
+    const paragraphEnd =
+      nextParagraph === null ? text.length : nextParagraph.index + nextParagraph[0].indexOf("\n");
+    const newline = text.indexOf("\n", paragraphStart);
+    if (newline !== -1 && newline <= paragraphEnd) {
+      const candidate = text.slice(paragraphStart, newline).trim();
+      if (candidate !== "") summary = candidate;
+    }
+    if (nextParagraph === null) return summary;
+    paragraphStart = nextParagraph.index + nextParagraph[0].length;
+  }
+}
+
+/**
+ * One line of reasoning for the collapsed row: the latest completed paragraph
+ * while streaming, the opening line once settled. Bold markers are dropped
+ * because the row renders plain text, not Markdown, and would show them raw.
+ */
+export function reasoningSummary(text, running) {
+  if (typeof text !== "string" || text === "") return "";
+  const summary = running
+    ? latestCompletedParagraphFirstLine(text)
+    : firstLine(text);
+  return summary.replaceAll("**", "");
+}
+
+/**
  * POST one JSON body to a same-origin route.
  *
  * Kept as a module-level function so a test can pass its own implementation
@@ -301,6 +372,9 @@ export function createAskStore({
       sessionId,
       question,
       answer: "",
+      // Reasoning is the model's own thinking for this answer. It is shown in
+      // the detail but never copied, forked, or sent back with a new question.
+      reasoning: "",
       context: typeof context?.text === "string" ? context.text : "",
       contextLabel: typeof context?.label === "string" ? context.label : "",
       // Preferences are captured at question time, so regenerate replays the
@@ -423,6 +497,12 @@ export function createAskStore({
         if (typeof payload.text !== "string" || payload.text === "") return;
         appendDelta(id, payload.text);
         return;
+      case ASK_EVENTS.reasoning:
+        // A separate event keeps older clients working: they ignore an event
+        // type they do not know and still render the answer unchanged.
+        if (typeof payload.text !== "string" || payload.text === "") return;
+        appendReasoning(id, payload.text);
+        return;
       case ASK_EVENTS.usage:
         patch(id, { usage: payload.usage ?? null });
         return;
@@ -451,16 +531,29 @@ export function createAskStore({
    * Append streamed text and notify at most once per window.
    *
    * The text lands on the record immediately; only the re-render is throttled,
-   * so the final `done` always shows everything the provider sent.
+   * so the final `done` always shows everything the provider sent. Answer and
+   * reasoning share one window: the panel is already re-rendering for both.
    */
-  function appendDelta(id, text) {
+  function appendStreamText(id, field, text) {
     const index = indexOf(id);
     if (index < 0) return;
-    items[index] = { ...items[index], answer: items[index].answer + text };
-    const current = now();
-    if (current - lastDeltaEmit < ASK_DELTA_EMIT_MS) return;
-    lastDeltaEmit = current;
+    const current = items[index];
+    const previous = typeof current[field] === "string" ? current[field] : "";
+    items[index] = { ...current, [field]: previous + text };
+    const at = now();
+    if (at - lastDeltaEmit < ASK_DELTA_EMIT_MS) return;
+    lastDeltaEmit = at;
     emit();
+  }
+
+  /** Append one answer delta. */
+  function appendDelta(id, text) {
+    appendStreamText(id, "answer", text);
+  }
+
+  /** Append one reasoning delta. */
+  function appendReasoning(id, text) {
+    appendStreamText(id, "reasoning", text);
   }
 
   /**
@@ -485,7 +578,7 @@ export function createAskStore({
     return record;
   }
 
-  /** Stop one running record and keep whatever answer already arrived. */
+  /** Stop one running record and keep whatever answer and reasoning arrived. */
   function stop(sessionId, id) {
     const record = find(id);
     if (record === null || record.sessionId !== sessionId || record.status !== "running") {
@@ -512,6 +605,7 @@ export function createAskStore({
     if (record === null || record.status === "running") return false;
     const next = patch(id, {
       answer: "",
+      reasoning: "",
       usage: null,
       error: null,
       status: "running",

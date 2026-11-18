@@ -355,11 +355,78 @@ export const STYLE = `
       .dqs-ask-answer {
         min-width: 0;
       }
-      .dqs-ask-thinking {
+      .dqs-ask-think {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        margin: 0 0 10px;
+      }
+      .dqs-ask-think-row {
+        overflow: hidden;
+      }
+      .dqs-ask-think[data-expanded] [data-open] [data-disclosure-header] {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--dsw-alias-bg-base);
+      }
+      .dqs-ask-think-leading {
+        flex-shrink: 0;
+      }
+      .dqs-ask-think-title {
+        font-weight: 400;
+      }
+      .dqs-ask-think-separator {
+        flex: none;
+        width: 2px;
+        height: 2px;
+        margin: 0 8px;
+        border-radius: 1px;
+        background: var(--dsw-alias-label-caption);
+      }
+      .dqs-ask-think-summary {
+        flex: auto;
+        min-width: 0;
+        overflow: hidden;
+        font-size: var(--dsh-content-font-size-secondary, 13px);
+        line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+        white-space: nowrap;
+      }
+      .dqs-ask-think-summaryText {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .dqs-ask-think-summary[data-streaming] {
+        mask-image: linear-gradient(90deg, #000 calc(100% - 48px), #0000);
+      }
+      .dqs-ask-think-summary[data-streaming] .dqs-ask-think-summaryText {
+        overflow: visible;
+        text-overflow: clip;
+      }
+      .dqs-ask-think:not([data-preview]) .dqs-ask-think-separator,
+      .dqs-ask-think:not([data-preview]) .dqs-ask-think-summary {
+        display: none;
+      }
+      .dqs-ask-think-body {
+        min-width: 0;
+        padding: 4px 0 4px calc(22px + var(--dsh-content-font-delta, 0px));
+      }
+      .dqs-ask-waiting {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        color: var(--dsw-alias-label-secondary);
+        gap: 6px;
+        min-height: calc(24px + var(--dsh-content-font-delta, 0px));
+        color: var(--dsw-alias-label-tertiary);
+        font-size: var(--dsh-content-font-size-secondary, 13px);
+        font-weight: 400;
+        line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+      }
+      .dqs-ask-waiting-icon {
+        display: inline-flex;
+        flex: none;
+        justify-content: center;
+        width: calc(16px + var(--dsh-content-font-delta, 0px));
       }
       .dqs-ask-dot {
         width: 6px;

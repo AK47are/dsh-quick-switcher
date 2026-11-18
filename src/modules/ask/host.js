@@ -242,6 +242,14 @@ async function askRoute(ctx, running, live, request, response) {
       if (chunk === null || typeof chunk !== "object") continue;
       if (chunk.type === "text-delta" && typeof chunk.text === "string" && chunk.text !== "") {
         send({ type: ASK_EVENTS.delta, text: chunk.text });
+      } else if (
+        chunk.type === "reasoning-delta" &&
+        typeof chunk.text === "string" &&
+        chunk.text !== ""
+      ) {
+        // Reasoning is forwarded with its own event so an older client that
+        // ignores unknown event types still renders the answer unchanged.
+        send({ type: ASK_EVENTS.reasoning, text: chunk.text });
       } else if (chunk.type === "usage") {
         send({ type: ASK_EVENTS.usage, usage: chunk.usage });
       } else if (chunk.type === "finish") {

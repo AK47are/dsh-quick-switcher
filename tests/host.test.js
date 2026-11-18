@@ -241,6 +241,33 @@ test("the ask route streams start, deltas, usage, finish, and done", async () =>
   assert.equal(response.ended, true);
 });
 
+test("the ask route forwards reasoning deltas with their own event", async () => {
+  async function* stream() {
+    yield { type: "reasoning-delta", text: "think " };
+    yield { type: "reasoning-delta", text: "more" };
+    yield { type: "text-delta", text: "answer" };
+    yield { type: "reasoning-delta", text: "" };
+    yield { type: "finish", reason: "stop" };
+  }
+  const { ctx, routes } = createContext({
+    agent: createAgent(),
+    llm: { stream: () => stream() },
+  });
+  apply(ctx);
+  const handler = routes.get("/dsh-quick-switcher/ask");
+
+  const response = await post(handler, { sessionId: "s1", question: "why" });
+  const events = eventsOf(response);
+  assert.deepEqual(
+    events.map((event) => event.type),
+    ["start", "reasoning", "reasoning", "delta", "finish", "done"],
+  );
+  assert.deepEqual(
+    events.filter((event) => event.type === "reasoning").map((event) => event.text),
+    ["think ", "more"],
+  );
+});
+
 test("the ask route refuses a foreign origin and a non-POST method", async () => {
   const { ctx, routes } = createContext({ agent: createAgent(), llm: {} });
   apply(ctx);

@@ -10,7 +10,9 @@ import {
   createAskUi,
   createAskView,
   detailKeyAction,
+  displayReasoning,
   isEditableTarget,
+  reasoningSummary,
   statusLabelKey,
 } from "../src/modules/ask/logic.js";
 
@@ -840,4 +842,39 @@ test("no pending interaction, or an unknown one, sends no background", () => {
 
 test("the copy feedback window is the documented 1600 ms", () => {
   assert.equal(ASK_COPY_FEEDBACK_MS, 1600);
+});
+
+test("reasoning hides an encrypted signature and keeps the visible text", () => {
+  assert.equal(displayReasoning(""), "");
+  assert.equal(displayReasoning("plain reasoning"), "plain reasoning");
+  // The opening tag is still arriving, so nothing can be shown yet.
+  assert.equal(displayReasoning("<signature>"), "");
+  assert.equal(displayReasoning("<signature>opaque"), "");
+  assert.equal(displayReasoning("<signature>opaque</signature>"), "");
+  assert.equal(
+    displayReasoning("<signature>opaque</signature>\n\nVisible thought"),
+    "Visible thought",
+  );
+  // A leading angle bracket that is not a signature is ordinary reasoning.
+  assert.equal(displayReasoning("<div>not a signature"), "<div>not a signature");
+});
+
+test("the reasoning summary follows the streaming and settled rules", () => {
+  assert.equal(reasoningSummary("", true), "");
+  // A line still arriving is not complete enough to preview yet.
+  assert.equal(reasoningSummary("one line", true), "");
+  assert.equal(reasoningSummary("one line", false), "one line");
+  assert.equal(reasoningSummary("first\nsecond", true), "first");
+  // While streaming, the latest completed paragraph wins.
+  assert.equal(
+    reasoningSummary("para one\n\npara two\nstill arriving", true),
+    "para two",
+  );
+  // Once settled, the opening line is the summary.
+  assert.equal(
+    reasoningSummary("para one\n\npara two\nstill", false),
+    "para one",
+  );
+  // Bold markers would show raw in the plain-text row.
+  assert.equal(reasoningSummary("**bold** opener\nrest", false), "bold opener");
 });

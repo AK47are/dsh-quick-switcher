@@ -4,12 +4,14 @@
  * document with the same package DSH itself uses before writing it. */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseMarketIndex } from "@deepseek-ai/dsh-plugin-market-index";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const indexPath = join(root, "market", "index.json");
+const repoUrl = "https://github.com/AK47are/dsh-quick-switcher";
 // Relative icon references resolve against this URL, so it must match the
 // address users add to Discover. The main branch is the only published one.
 const indexUrl = "https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/market/index.json";
@@ -46,15 +48,33 @@ function readIndex() {
   return existsSync(indexPath) ? JSON.parse(readFileSync(indexPath, "utf8")) : emptyIndex();
 }
 
+/**
+ * The install source for this version. npm is the intended route but is not
+ * published yet, so the default pins a commit: a git source makes Discover
+ * installs work from a public repository, at the cost of one build-script
+ * approval while pnpm runs prepare.
+ */
+function releaseSource() {
+  if (process.env.MARKET_SOURCE === "npm") {
+    return {
+      publishTimestamp: Number(process.env.MARKET_PUBLISH_TIME ?? Math.floor(Date.now() / 1000)),
+      source: { type: "npm" },
+    };
+  }
+  const commit = execSync("git rev-parse HEAD", { cwd: root, encoding: "utf8" }).trim();
+  const committedAt = Number(execSync("git log -1 --format=%ct", { cwd: root, encoding: "utf8" }).trim());
+  return {
+    publishTimestamp: Number(process.env.MARKET_PUBLISH_TIME ?? committedAt),
+    source: { type: "git", url: repoUrl, commit },
+  };
+}
+
 /** Replace the entry for the current package version, keeping older versions. */
 function withCurrentVersion(index) {
   const existing = index.plugins.find((entry) => entry.name === pkg.name);
   const version = {
     version: pkg.version,
-    // One Unix-second timestamp per release; the index itself is the record,
-    // npm owns the package's real publish time.
-    publishTimestamp: Number(process.env.MARKET_PUBLISH_TIME ?? Math.floor(Date.now() / 1000)),
-    source: { type: "npm" },
+    ...releaseSource(),
     engines: pkg.engines?.dsh === undefined ? {} : { dsh: pkg.engines.dsh },
   };
   const versions = (existing?.versions ?? [])
@@ -101,9 +121,6 @@ function check(index) {
   const version = entry.versions.find((candidate) => candidate.version === pkg.version);
   if (version === undefined) {
     throw new Error(`market/index.json is missing ${pkg.version}; run npm run market`);
-  }
-  if (version.source.type !== "npm") {
-    throw new Error(`market/index.json lists ${pkg.version} as ${version.source.type}, expected npm`);
   }
   return parsed;
 }

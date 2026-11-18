@@ -24,19 +24,7 @@
 
 需要 DSH 0.2.2 或更新版本，且只支持 Web 端。
 
-从插件市场安装：
-
-1. 打开设置，进入插件页的 Discover 标签页
-2. 添加索引 `https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/market/index.json`
-3. 安装 `dsh-quick-switcher`，启用后刷新页面
-
-从 npm 安装，可以在插件管理器里按包名搜索，也可以：
-
-```
-dsh plugin --profile web add dsh-quick-switcher
-```
-
-npm 包里带的是构建好的客户端与宿主产物，安装过程不跑任何构建脚本。命令行安装后重启 `dsh web`。
+npm 包尚未发布，目前从源码安装。
 
 从源码安装：
 
@@ -46,7 +34,13 @@ cd dsh-quick-switcher
 npm install
 ```
 
-然后把目录作为本地 bundle 装进 profile 并刷新页面。符号链接安装不会触发 prepare，拉取新源码后要手动跑一次 `npm run build`。
+`npm install` 会生成 `client.js` 与 `host.js`。把本目录作为本地 bundle 装进当前 profile，刷新页面即可使用；更新源码后重新跑一次 `npm run build`。
+
+也可以从项目自带的市场索引安装：
+
+1. 打开设置，进入插件页的 Discover 标签页
+2. 添加索引 `https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/market/index.json`
+3. 安装 `dsh-quick-switcher`，索引的安装源是钉住 commit 的 git 地址，pnpm 会拦下 `prepare`，插件管理器列出待允许的构建脚本时点允许并重试
 
 ## 使用
 

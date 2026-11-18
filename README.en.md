@@ -24,19 +24,7 @@ The side-question trigger also works at the end of the input, so `what changed?`
 
 DSH 0.2.2 or newer is required, and only the Web surface is supported.
 
-From the plugin market:
-
-1. Open Settings, then the Plugins page and its Discover tab
-2. Add the index `https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/market/index.json`
-3. Install `dsh-quick-switcher`, enable it, then refresh the page
-
-From npm, by package name in the plugin manager, or:
-
-```
-dsh plugin --profile web add dsh-quick-switcher
-```
-
-The npm package ships both built entries, so installing runs no build script. Restart `dsh web` after a command-line install.
+The npm package is not published yet, so install from source for now.
 
 From source:
 
@@ -46,7 +34,13 @@ cd dsh-quick-switcher
 npm install
 ```
 
-Then install the directory as a local bundle and refresh. A linked install does not run the prepare script, so run `npm run build` after pulling changes.
+`npm install` builds `client.js` and `host.js`. Install this directory as a local bundle in the current profile and refresh the page; run `npm run build` again after pulling changes.
+
+The repository also publishes its own market index:
+
+1. Open Settings, then the Plugins page and its Discover tab
+2. Add the index `https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/market/index.json`
+3. Install `dsh-quick-switcher`, whose source in the index is a commit-pinned git URL; pnpm stops at `prepare`, so allow the pending build scripts when the plugin manager lists them and retry
 
 ## Use
 

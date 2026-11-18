@@ -90,7 +90,7 @@ npm install
 
 ## 文档
 
-这些文档都由 AI 生成，统一放在 `.agents/docs/` 下：完整行为参考是[使用指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.md)，给其他插件用的模块接口是[扩展指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.md)，每个难以回退的决定记录在[ADR 索引](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/adr/索引.md)。英文版是[使用指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.en.md)与[扩展指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.en.md)，本页对应的英文版是 [README.en.md](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.en.md)。
+这些文档都由 AI 生成，统一放在 `.agents/docs/` 下：完整行为参考是[使用指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/使用指南.md)，给其他插件用的模块接口是[扩展指南](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/扩展指南.md)，每个难以回退的决定记录在 [ADR 索引](https://github.com/AK47are/dsh-quick-switcher/blob/main/.agents/docs/adr/索引.md)。
 
 ## 许可证
 

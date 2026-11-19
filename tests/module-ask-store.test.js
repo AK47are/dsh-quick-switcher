@@ -5,8 +5,68 @@ import {
   createAskStore,
 } from "../src/modules/ask/logic.js";
 import { ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "../src/modules/ask/shared.js";
+import { parseAskRecords, serializeAskRecords, weighAskRecords } from "../src/modules/ask/storage.js";
 
 const t = (key) => key;
+
+/** A record storage double that keeps the last written snapshot in memory. */
+function fakeRecordStorage(initial = []) {
+  const state = {
+    records: initial.slice(),
+    text: serializeAskRecords(initial),
+    saves: 0,
+    clears: 0,
+  };
+  return {
+    state,
+    // The stored text keeps `running`; loading is what turns it into aborted,
+    // exactly like the real facade.
+    load: () => parseAskRecords(state.text),
+    save(records) {
+      state.saves += 1;
+      state.records = records.slice();
+      state.text = serializeAskRecords(records);
+      return { ok: true, records: state.records, text: state.text };
+    },
+    clear() {
+      state.clears += 1;
+      state.records = [];
+      state.text = "";
+    },
+  };
+}
+
+/** A browser-shaped event target without a real DOM. */
+function fakeWindow() {
+  const document = new EventTarget();
+  document.visibilityState = "visible";
+  const window = new EventTarget();
+  window.document = document;
+  return window;
+}
+
+/** One record as it would come back from storage. */
+function storedRecord(overrides = {}) {
+  return {
+    id: "ask-1",
+    sessionId: "s1",
+    question: "q",
+    answer: "a",
+    reasoning: "",
+    includeAttachments: true,
+    choice: { provider: "", model: "", effort: "lowest" },
+    provider: "",
+    model: "",
+    effort: "",
+    effortName: "",
+    usage: null,
+    status: "done",
+    error: null,
+    atSeq: 1,
+    startedAt: 1000,
+    ...overrides,
+  };
+}
 
 function sse(...events) {
   return events.map((event) => `data: ${JSON.stringify(event)}\n\n`);
@@ -398,64 +458,6 @@ test("streamed text is kept on every chunk while notifications are throttled", a
   assert.equal(store.find(record.id).answer, "abc");
 });
 
-test("one session keeps at most twenty records, newest first", async () => {
-  const store = createAskStore({
-    request: async () => responseOf(heldStream(sse({ type: "done" }))),
-    now: () => 0,
-  });
-
-  for (let index = 0; index < 21; index += 1) {
-    assert.notEqual(store.ask("s1", `q${index}`), null);
-    await flush();
-  }
-
-  const entries = store.entriesOf("s1");
-  assert.equal(entries.length, 20);
-  assert.equal(entries[0].question, "q20");
-  assert.equal(entries[19].question, "q1");
-});
-
-test("at most eight sessions keep records", async () => {
-  const store = createAskStore({
-    request: async () => responseOf(heldStream(sse({ type: "done" }))),
-    now: () => 0,
-  });
-
-  for (let index = 0; index < 9; index += 1) {
-    assert.notEqual(store.ask(`s${index}`, "q"), null);
-    await flush();
-  }
-
-  assert.equal(store.entriesOf("s0").length, 0);
-  for (let index = 1; index < 9; index += 1) {
-    assert.equal(store.entriesOf(`s${index}`).length, 1);
-  }
-});
-
-test("regenerating sends the context it is given, not the first attempt's", async () => {
-  const seen = [];
-  const store = createAskStore({
-    request: async (path, body) => {
-      seen.push(body);
-      return responseOf(heldStream(sse({ type: "done" })));
-    },
-    now: () => 0,
-  });
-
-  const record = store.ask("s1", "q", "first card");
-  await flush();
-  assert.equal(seen[0].context, "first card");
-
-  store.regenerate("s1", record.id, "second card");
-  await flush();
-  assert.equal(seen[1].context, "second card");
-
-  // No card on screen means no context field at all.
-  store.regenerate("s1", record.id, "");
-  await flush();
-  assert.equal("context" in seen[2], false);
-});
-
 test("fork posts the question, visible answer, prefix, and no background", async () => {
   const seen = [];
   const store = createAskStore({
@@ -553,5 +555,216 @@ test("dispose aborts the live request and drops every record", async () => {
   store.dispose();
   assert.equal(signal.aborted, true);
   assert.equal(signal.reason.message, UNLOADED_MESSAGE);
+  assert.equal(store.find(record.id), null);
+});
+
+test("a restored list over the byte cap is trimmed back into storage", () => {
+  const initial = [];
+  for (let index = 0; index < 21; index += 1) {
+    initial.push(
+      storedRecord({
+        id: `ask-${index + 1}`,
+        question: `question ${index}`,
+        startedAt: 1000 + index,
+      }),
+    );
+  }
+  const storage = fakeRecordStorage(initial);
+  // A cap below the whole document forces the oldest records out on load.
+  const limit = weighAskRecords(initial.slice(0, 10)).bytes;
+  const store = createAskStore({
+    request: async () => new Promise(() => {}),
+    now: () => 2000,
+    recordStorage: storage,
+    recordLimit: () => limit,
+  });
+
+  assert.ok(store.entriesOf("s1").length < 21);
+  assert.equal(store.entriesOf("s1").length, storage.state.records.length);
+  assert.equal(store.find("ask-1"), null);
+});
+
+test("records survive a reload and keep their reasoning", async () => {
+  const storage = fakeRecordStorage();
+  const first = createAskStore({
+    request: async () =>
+      responseOf(
+        heldStream(
+          sse(
+            { type: "start", atSeq: 2, provider: "p", model: "m" },
+            { type: "reasoning", text: "think" },
+            { type: "delta", text: "hi" },
+            { type: "done" },
+          ),
+        ),
+      ),
+    now: () => 1000,
+    recordStorage: storage,
+  });
+
+  const record = first.ask("s1", "why?", "card");
+  await flush();
+  assert.equal(storage.state.saves > 0, true);
+  assert.equal(first.find(record.id).status, "done");
+
+  const second = createAskStore({
+    request: async () => new Promise(() => {}),
+    now: () => 2000,
+    recordStorage: storage,
+  });
+  const restored = second.entriesOf("s1");
+  assert.equal(restored.length, 1);
+  assert.equal(restored[0].question, "why?");
+  assert.equal(restored[0].answer, "hi");
+  assert.equal(restored[0].reasoning, "think");
+  assert.equal(restored[0].status, "done");
+  assert.equal(restored[0].provider, "p");
+  assert.equal(restored[0].atSeq, 2);
+  assert.equal(restored[0].includeAttachments, true);
+  assert.deepEqual(restored[0].choice, { provider: "", model: "", effort: "lowest" });
+  // The pending card is request input, not record state.
+  assert.equal("context" in restored[0], false);
+
+  // The id counter continues instead of reusing ask-1.
+  const next = second.ask("s1", "again");
+  assert.equal(next.id, "ask-2");
+});
+
+test("a pagehide flush keeps the last streamed text for the next store", async () => {
+  const storage = fakeRecordStorage();
+  const window = fakeWindow();
+  const first = createAskStore({
+    request: async () =>
+      responseOf(
+        heldStream(
+          sse(
+            { type: "start", atSeq: 1 },
+            { type: "reasoning", text: "think" },
+            { type: "delta", text: "half" },
+          ),
+        ),
+      ),
+    now: () => 0,
+    recordStorage: storage,
+    eventTarget: window,
+  });
+
+  const record = first.ask("s1", "q");
+  await flush();
+  assert.equal(first.find(record.id).status, "running");
+  // The frozen clock keeps the throttled write at the ask; the pagehide flush
+  // is what lands the text the user can still see.
+  assert.equal(storage.state.records[0].answer, "");
+  window.dispatchEvent(new Event("pagehide"));
+  assert.equal(storage.state.records[0].answer, "half");
+  assert.equal(storage.state.records[0].reasoning, "think");
+
+  first.dispose();
+  const second = createAskStore({
+    request: async () => new Promise(() => {}),
+    now: () => 1000,
+    recordStorage: storage,
+  });
+  const restored = second.find(record.id);
+  assert.equal(restored.status, "aborted");
+  assert.equal(restored.answer, "half");
+  assert.equal(restored.reasoning, "think");
+  second.dispose();
+});
+
+test("the byte cap drops the oldest record on the next write", async () => {
+  const storage = fakeRecordStorage();
+  let limit = 0;
+  let clock = 0;
+  const store = createAskStore({
+    request: async () => responseOf(heldStream(sse({ type: "done" }))),
+    now: () => clock,
+    recordStorage: storage,
+    recordLimit: () => limit,
+  });
+
+  const first = store.ask("s1", "first");
+  await flush();
+  assert.equal(store.find(first.id).status, "done");
+  limit = weighAskRecords([store.find(first.id)]).bytes + 60;
+
+  clock = 1000;
+  const second = store.ask("s1", "second");
+  await flush();
+  assert.deepEqual(
+    store.entriesOf("s1").map((record) => record.id),
+    [second.id],
+  );
+  assert.deepEqual(
+    storage.state.records.map((record) => record.id),
+    [second.id],
+  );
+});
+
+test("regenerating sends the context it is given, not the first attempt's", async () => {
+  const seen = [];
+  const store = createAskStore({
+    request: async (path, body) => {
+      seen.push(body);
+      return responseOf(heldStream(sse({ type: "done" })));
+    },
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q", "first card");
+  await flush();
+  assert.equal(seen[0].context, "first card");
+
+  store.regenerate("s1", record.id, "second card");
+  await flush();
+  assert.equal(seen[1].context, "second card");
+
+  // No card on screen means no context field at all.
+  store.regenerate("s1", record.id, "");
+  await flush();
+  assert.equal("context" in seen[2], false);
+});
+
+test("clearing drops the live list and the stored document", async () => {
+  const storage = fakeRecordStorage();
+  let signal;
+  const store = createAskStore({
+    request: (path, body, received) => {
+      signal = received;
+      return new Promise(() => {});
+    },
+    now: () => 0,
+    recordStorage: storage,
+  });
+
+  store.ask("s1", "q");
+  await flush();
+  assert.equal(store.entriesOf("s1").length, 1);
+  store.clearRecords();
+  assert.equal(signal.aborted, true);
+  assert.equal(store.entriesOf("s1").length, 0);
+  assert.equal(storage.state.clears, 1);
+  assert.deepEqual(storage.state.records, []);
+});
+
+test("dispose writes the last state before dropping memory", async () => {
+  const storage = fakeRecordStorage();
+  let signal;
+  const store = createAskStore({
+    request: (path, body, received) => {
+      signal = received;
+      return new Promise(() => {});
+    },
+    now: () => 0,
+    recordStorage: storage,
+  });
+
+  const record = store.ask("s1", "q");
+  const savesBefore = storage.state.saves;
+  store.dispose();
+  assert.equal(signal.aborted, true);
+  assert.equal(storage.state.saves > savesBefore, true);
+  assert.equal(storage.state.records.length, 1);
+  assert.equal(storage.state.records[0].status, "running");
   assert.equal(store.find(record.id), null);
 });

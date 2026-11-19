@@ -4,15 +4,44 @@ import { relativeTime } from "../../core/lib/format.js";
 import { buildPendingContext } from "./context.js";
 import { LOWEST_EFFORT } from "./models.js";
 import { ASK_EVENTS, ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
+import {
+  ASK_RECORD_LIMIT_DEFAULT_BYTES,
+  createAskRecordStorage,
+  readAskRecordLimit,
+  trimAskRecordsToLimit,
+} from "./storage.js";
 
 /** Re-render rate while an answer streams; text is kept on every chunk. */
 export const ASK_DELTA_EMIT_MS = 50;
 
-/** Records kept per session; the oldest one is dropped first. */
-export const ASK_RECORD_LIMIT = 20;
+/**
+ * Write rate while an answer streams; text is kept on every chunk.
+ *
+ * Re-rendering every 50ms is cheap, but rewriting the whole document that
+ * often is not: a reload loses at most the last second of a stream, and the
+ * pagehide flush closes that gap further.
+ */
+export const ASK_PERSIST_MS = 1000;
 
-/** Sessions whose records survive; the least recently asked is dropped. */
-export const ASK_SESSION_LIMIT = 8;
+/**
+ * Continue the local id counter past every restored record.
+ *
+ * Ids are `ask-<n>` and are only unique within this browser document. Starting
+ * again at 1 after a reload would make a new record reuse an old id, and the
+ * store resolves ids by first match, so the detail could point at the wrong
+ * question. Non-matching ids are ignored; they simply cannot collide with the
+ * generated form.
+ */
+function nextRecordId(records) {
+  let max = 0;
+  for (const record of records) {
+    const match = /^ask-(\d+)$/u.exec(record.id);
+    if (match === null) continue;
+    const value = Number(match[1]);
+    if (Number.isFinite(value) && value > max) max = value;
+  }
+  return max + 1;
+}
 
 /** How long the footer shows "Copied" before the label settles back. */
 export const ASK_COPY_FEEDBACK_MS = 1600;
@@ -82,9 +111,10 @@ export function canCopy(record) {
 /**
  * Whether the same question can be asked again.
  *
- * Stopped and failed records qualify: their question and background are still
- * the ones the user wants to retry. The running record does not, because the
- * store allows one request per session.
+ * Stopped and failed records qualify: their question and pinned choice are
+ * still the ones the user wants to retry, and the pending card is read again
+ * when the retry is sent. The running record does not, because the store allows
+ * one request per session.
  */
 export function canRegenerate(record) {
   return record !== null && record !== undefined && record.status !== "running";
@@ -226,20 +256,24 @@ async function refusalOf(response) {
 }
 
 /**
- * Create the in-memory side-question store.
+ * Create the side-question store, backed by browser-local storage.
  *
  * One record list for the whole plugin, keyed by session. The store never
  * touches DSH session history: a side question leaves no event, and the only
  * write it can cause is the single user message a fork inserts into the new
- * session.
+ * session. It does mirror its list into the record storage, so a reload can
+ * rebuild the same rows instead of losing a question the user just asked.
  *
- * `request`, `now`, `translate`, `includeAttachments`, and `selection` are
- * injectable so tests can drive the stream with a fake clock and a fake
- * transport. The module passes readers for the settings scope, so a preference
- * change applies to the next question instead of to the copy of the store
- * imported here; `selection` reports the pinned provider, model, and reasoning
- * effort, with empty strings meaning "follow the session". The default
- * `translate` is the identity, which keeps the store usable outside the panel.
+ * `request`, `now`, `translate`, `includeAttachments`, `selection`,
+ * `recordStorage`, `recordLimit`, and `eventTarget` are injectable so tests can
+ * drive the stream with a fake clock, a fake transport, and a fake document.
+ * The module passes readers for the settings scope, so a preference change
+ * applies to the next question instead of to the copy of the store imported
+ * here; `selection` reports the pinned provider, model, and reasoning effort,
+ * with empty strings meaning "follow the session". `recordStorage` is the
+ * browser-local copy of the record list, and `recordLimit` reads the byte cap
+ * chosen in Settings, with 0 meaning no cap. The default `translate` is the
+ * identity, which keeps the store usable outside the panel.
  */
 export function createAskStore({
   request = postJson,
@@ -247,6 +281,9 @@ export function createAskStore({
   translate = (key) => key,
   includeAttachments = () => true,
   selection = () => ({}),
+  recordStorage = createAskRecordStorage(),
+  recordLimit = () => ASK_RECORD_LIMIT_DEFAULT_BYTES,
+  eventTarget = globalThis,
 } = {}) {
   /** Newest first. Every mutation replaces the record object, never edits it. */
   const items = [];
@@ -257,6 +294,23 @@ export function createAskStore({
   const listeners = new Set();
   let nextId = 1;
   let lastDeltaEmit = -Infinity;
+  let lastPersistAt = -Infinity;
+  let disposed = false;
+
+  // Restore before any listener subscribes: the first view built for the panel
+  // must already show the previous run's records. The byte limit applies here
+  // as well, so overflow that happened before the reload cannot outlive it.
+  // `restoredTrimmed` records whether loading changed the set, and the first
+  // write below makes the stored copy agree with memory.
+  const loaded = recordStorage.load();
+  for (const record of loaded) items.push(record);
+  nextId = nextRecordId(items);
+  const restoredLimit = trimAskRecordsToLimit(items, readLimit());
+  const restoredTrimmed = restoredLimit.length !== loaded.length;
+  if (restoredTrimmed) {
+    items.length = 0;
+    items.push(...restoredLimit);
+  }
 
   function emit() {
     for (const listener of [...listeners]) {
@@ -299,48 +353,78 @@ export function createAskStore({
   }
 
   /**
-   * Drop the oldest records of one session past the cap.
+   * Read the chosen byte cap once.
    *
-   * A running record is never dropped: it is the newest of its session anyway,
-   * but keeping the check explicit makes the invariant readable.
+   * A broken settings reader must not break asking, so a throwing reader falls
+   * back to the default budget. Zero and malformed values mean the same thing:
+   * the setting always names a size, and the default is the size a fresh
+   * profile starts with.
    */
-  function trimRecords(sessionId) {
-    const owned = [];
-    for (let index = items.length - 1; index >= 0; index -= 1) {
-      if (items[index].sessionId === sessionId) owned.push(index);
-    }
-    for (const index of owned.slice(0, Math.max(0, owned.length - ASK_RECORD_LIMIT))) {
-      if (items[index].status === "running") continue;
-      items.splice(index, 1);
+  function readLimit() {
+    try {
+      return readAskRecordLimit(recordLimit());
+    } catch (error) {
+      console.error("[dsh-quick-switcher] side question record limit reader failed", error);
+      return ASK_RECORD_LIMIT_DEFAULT_BYTES;
     }
   }
 
   /**
-   * Drop the least recently asked sessions past the cap.
+   * Write the current list, first dropping what the byte cap excludes.
    *
-   * Order comes from each session's newest record, so "recently asked" means
-   * the last question in that session, not the last time it was viewed. A
-   * session with a running request survives regardless of its age.
+   * The cap is applied to memory as well as to storage: a list that shows
+   * records which cannot survive a reload would be a lie. A running record is
+   * the exception, because it cannot be reconstructed and a stream in flight
+   * must stay visible; the limit is therefore soft for the newest record.
    */
-  function trimSessions() {
-    /** @type {Map<string, number>} */
-    const newest = new Map();
-    for (const item of items) {
-      if (!newest.has(item.sessionId)) newest.set(item.sessionId, item.startedAt);
+  function persistNow() {
+    if (disposed) return;
+    const limited = trimAskRecordsToLimit(items, readLimit());
+    if (limited.length !== items.length) {
+      items.length = 0;
+      items.push(...limited);
+      emit();
     }
-    if (newest.size <= ASK_SESSION_LIMIT) return;
-    const keep = new Set(
-      [...newest.entries()]
-        .sort((left, right) => right[1] - left[1])
-        .slice(0, ASK_SESSION_LIMIT)
-        .map(([sessionId]) => sessionId),
-    );
-    for (let index = items.length - 1; index >= 0; index -= 1) {
-      const item = items[index];
-      if (keep.has(item.sessionId)) continue;
-      if (item.status === "running") continue;
-      items.splice(index, 1);
-    }
+    recordStorage.save(items);
+    lastPersistAt = now();
+  }
+
+  /** Persist a streaming update at most once per ASK_PERSIST_MS. */
+  function persistStreaming() {
+    if (disposed) return;
+    const at = now();
+    if (at - lastPersistAt < ASK_PERSIST_MS) return;
+    persistNow();
+  }
+
+  /**
+   * Flush when the page is hidden or unloaded.
+   *
+   * The streaming write is throttled, so the last second of a stream reaches
+   * storage through this flush. `pagehide` is the event a reload fires last;
+   * `visibilitychange` covers a tab that is backgrounded and then killed
+   * without another turn. The listeners are only installed when a document
+   * exists, which keeps the store quiet under `node --test`.
+   */
+  const pageDocument = eventTarget?.document ?? null;
+  function flushNow() {
+    persistNow();
+  }
+  function flushWhenHidden() {
+    if (pageDocument?.visibilityState === "hidden") persistNow();
+  }
+  const canListen =
+    pageDocument !== null &&
+    typeof eventTarget?.addEventListener === "function" &&
+    typeof pageDocument.addEventListener === "function";
+  if (canListen) {
+    eventTarget.addEventListener("pagehide", flushNow);
+    pageDocument.addEventListener("visibilitychange", flushWhenHidden);
+  }
+  function removePageListeners() {
+    if (!canListen) return;
+    eventTarget.removeEventListener?.("pagehide", flushNow);
+    pageDocument.removeEventListener?.("visibilitychange", flushWhenHidden);
   }
 
   /**
@@ -451,12 +535,14 @@ export function createAskStore({
       const latest = find(id);
       if (latest !== null && latest.status === "running") {
         patch(id, { status: "error", error: translate("askDisconnected") });
+        persistNow();
       }
     } catch (error) {
       if (controller.signal.aborted) return;
       const latest = find(id);
       if (latest === null || latest.status !== "running") return;
       patch(id, { status: "error", error: messageOf(error) });
+      persistNow();
     } finally {
       // A regenerate replaces the controller; only the owner may remove it.
       if (controllers.get(id) === controller) controllers.delete(id);
@@ -497,6 +583,9 @@ export function createAskStore({
           effortName:
             typeof payload.reasoningEffortName === "string" ? payload.reasoningEffortName : "",
         });
+        // The effective model and level are part of the record a reload shows,
+        // so they are written as soon as the host names them.
+        persistNow();
         return;
       case ASK_EVENTS.delta:
         if (typeof payload.text !== "string" || payload.text === "") return;
@@ -510,6 +599,7 @@ export function createAskStore({
         return;
       case ASK_EVENTS.usage:
         patch(id, { usage: payload.usage ?? null });
+        persistNow();
         return;
       case ASK_EVENTS.finish:
         // The reason is informational; `done` is what closes the record.
@@ -517,6 +607,7 @@ export function createAskStore({
       case ASK_EVENTS.done:
         if (controllers.get(id) !== undefined) controllers.delete(id);
         patch(id, { status: "done" });
+        persistNow();
         return;
       case ASK_EVENTS.error:
         patch(id, {
@@ -526,6 +617,7 @@ export function createAskStore({
               ? payload.message
               : translate("askFailed"),
         });
+        persistNow();
         return;
       default:
         return;
@@ -545,6 +637,10 @@ export function createAskStore({
     const current = items[index];
     const previous = typeof current[field] === "string" ? current[field] : "";
     items[index] = { ...current, [field]: previous + text };
+    // The persisted copy is a reload checkpoint, not a render feed: it is
+    // written on its own slower clock so a chatty stream cannot turn into a
+    // stringify of the whole list every 50ms.
+    persistStreaming();
     const at = now();
     if (at - lastDeltaEmit < ASK_DELTA_EMIT_MS) return;
     lastDeltaEmit = at;
@@ -575,10 +671,12 @@ export function createAskStore({
     if (runningOf(sessionId) !== null) return null;
     const record = createRecord(sessionId, text);
     items.unshift(record);
-    trimRecords(sessionId);
-    trimSessions();
     // The list shows the new row before the first byte arrives.
     emit();
+    // The question reaches storage before the request starts, so a reload
+    // during the handshake still finds it as an aborted record instead of
+    // losing the text the user just typed.
+    persistNow();
     start(record, context);
     return record;
   }
@@ -593,6 +691,7 @@ export function createAskStore({
     controllers.delete(id);
     controller?.abort(new Error("stopped by the user"));
     patch(id, { status: "aborted" });
+    persistNow();
     return true;
   }
 
@@ -629,6 +728,7 @@ export function createAskStore({
       effortName: "",
     });
     if (next === null) return false;
+    persistNow();
     start(next, context);
     return true;
   }
@@ -665,8 +765,41 @@ export function createAskStore({
     return payload.sessionId;
   }
 
-  /** Abort every request and drop every record; used when the plugin unloads. */
+  /**
+   * Drop every record and its stored copy; used by the settings clear action.
+   *
+   * A running request is aborted first: its late events must not recreate a
+   * record the user just erased. The key is removed instead of writing an empty
+   * array, so a cleared browser holds no side-question document at all.
+   */
+  function clearRecords() {
+    for (const controller of controllers.values()) {
+      controller.abort(new Error("cleared by the user"));
+    }
+    controllers.clear();
+    items.length = 0;
+    recordStorage.clear();
+    emit();
+  }
+
+  /** A copy of the live list, for the settings readout. */
+  function records() {
+    return items.slice();
+  }
+
+  /**
+   * Abort every request and flush the last state; used when the plugin unloads.
+   *
+   * The list is written before the memory copy is dropped, so a page unload
+   * keeps the newest streamed text. The copy is then cleared because the next
+   * load rebuilds it from storage; keeping both would let a reloaded plugin
+   * show a list that storage no longer agrees with.
+   */
   function dispose() {
+    if (disposed) return;
+    persistNow();
+    disposed = true;
+    removePageListeners();
     for (const controller of controllers.values()) {
       controller.abort(new Error(UNLOADED_MESSAGE));
     }
@@ -675,13 +808,17 @@ export function createAskStore({
     emit();
   }
 
+  if (restoredTrimmed) persistNow();
+
   return {
     ask,
     abortSession,
+    clearRecords,
     dispose,
     entriesOf,
     find,
     fork,
+    records,
     regenerate,
     stop,
     subscribe(listener) {
@@ -880,8 +1017,8 @@ export function createAskActions({ api, store, ui, panel, back }) {
    * Regenerate with the card the user is looking at now.
    *
    * `panel.pending` is a live getter over the latest session status, so the
-   * retry reads the card that is on screen then, not the one captured when the
-   * record was first created.
+   * same call works for a record restored from storage: it has no saved
+   * background, and this is where a fresh one comes from.
    */
   function regenerate(record) {
     if (record === null || record === undefined) return;

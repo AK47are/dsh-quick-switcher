@@ -64,7 +64,9 @@ Type `?` or `？` and the question, then press Enter. The answer streams into th
 - The thinking block appears only when the model actually returns reasoning; the default lowest effort may be `off`, in which case there is nothing to show
 - Thinking never travels with copy or fork: `C` copies only the answer, and `F` writes only the question and answer into the new session
 - The model defaults to the current session model at the lowest reasoning effort; both can be fixed in Settings
-- Closing the panel aborts generation and keeps the received answer, marked as stopped
+- Closing the panel or refreshing aborts generation and keeps the received answer and thinking, marked as stopped; records live in browser local storage and survive a refresh
+- Regenerating clears the answer and thinking and reads the pending card currently on screen; a fork carries only the question and answer
+- Record storage in Settings defaults to 1 MB and takes any size in MB; the readout shows the space in use and about how many side questions fit, including an estimate before the first record; clearing local records takes two clicks
 - In the detail view, `i` returns to the list, `C` copies, `R` regenerates, `F` forks and `S` stops
 
 ## Privacy
@@ -72,7 +74,7 @@ Type `?` or `？` and the question, then press Enter. The answer streams into th
 Apart from the model request a side question makes, the plugin sends nothing.
 
 - Settings, mode switches, the default mode and session access times live in browser local storage
-- Side-question records live in memory only and are lost on refresh
+- Side-question records live in browser local storage; Settings can cap or clear them. A side question never enters the DSH session log, and only an explicit fork writes the question and answer into a new session
 - A side question sends the conversation the model can see, its tool calls and the running step to the selected provider; images and files ride along by default and can be turned off in Settings
 - The side-question host endpoints are internal to the local DSH host and are not a public API
 - The plugin has no telemetry or analytics
@@ -83,6 +85,7 @@ Apart from the model request a side question makes, the plugin sends nothing.
 - Side question needs a configured model provider
 - Several features read DSH internals, so a DSH release that renames them can break a mode until it is updated
 - Archives, blank drafts and subagent sessions never appear, and browser-local state does not follow you to another browser
+- Two DSH windows write their own record snapshots, so the later write replaces the earlier one; a refresh interrupts the streaming side question, which can only be reopened as stopped
 
 ## Documentation
 

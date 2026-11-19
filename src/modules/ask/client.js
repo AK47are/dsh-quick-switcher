@@ -6,16 +6,17 @@ import { locale } from "./locale.js";
 import { ASK_TRIGGERS, createAskActions, createAskStore, createAskUi, createAskView } from "./logic.js";
 import { LOWEST_EFFORT, readChoice } from "./models.js";
 import { createAskSettings } from "./settings.js";
+import { readAskRecordLimit } from "./storage.js";
 
 export default defineModule("ask", (api) => {
   // The store outlives every panel mount, so a running answer keeps streaming
-  // while the panel is closed and its records survive reopen. The attachment
-  // and model preferences are read through the settings scope at request time:
-  // a change applies to the next question without rebuilding the store.
-  const askSettings = createAskSettings(api);
+  // while the panel is closed and its records survive reopen. The attachment,
+  // model, and storage-cap preferences are read through the settings scope at
+  // request or write time: a change applies without rebuilding the store.
   const store = createAskStore({
     translate: (key, params) => api.t(key, params),
     includeAttachments: () => api.settings.get("includeAttachments"),
+    recordLimit: () => readAskRecordLimit(api.settings.get("recordLimit")),
     // A null model means "follow the session"; the host resolves that, so the
     // client only sends a model when one is pinned. The effort is always sent:
     // its lowest default is the point of the setting, and the host floors it on
@@ -30,6 +31,10 @@ export default defineModule("ask", (api) => {
       };
     },
   });
+
+  // The settings control renders the cap, the readout of the live record list,
+  // and the clear action, so it needs the store instance rather than a copy.
+  const askSettings = createAskSettings(api, store);
 
   api.effect(() => () => store.dispose(), "ask: store");
 
@@ -55,6 +60,7 @@ export default defineModule("ask", (api) => {
               descriptionKey: "settingsAttachmentsDescription",
               hintKey: "settingsAttachmentsHint",
             },
+            askSettings.recordLimitField,
           ],
         },
       ],

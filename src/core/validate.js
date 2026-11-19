@@ -259,6 +259,13 @@ function validateField(moduleId, field, fieldIds, groupIndex, fieldIndex) {
   if (field.labelKey !== undefined && (typeof field.labelKey !== "string" || field.labelKey === "")) {
     fail(moduleId, `settings field "${field.id}" labelKey must be a non-empty string`);
   }
+  // A custom field may ask for the full row; the settings page turns this into
+  // its stacked row class. Keeping the value here matters: the field object is
+  // rebuilt from a whitelist, so a property not returned below never reaches
+  // the renderer.
+  if (field.layout !== undefined && field.layout !== "stack" && field.layout !== "row") {
+    fail(moduleId, `settings field "${field.id}" layout must be "stack" or "row"`);
+  }
 
   return {
     id: field.id,
@@ -267,6 +274,7 @@ function validateField(moduleId, field, fieldIds, groupIndex, fieldIndex) {
     labelKey: field.labelKey,
     descriptionKey: optionalString(moduleId, field.descriptionKey, `settings field "${field.id}" descriptionKey`),
     hintKey: optionalString(moduleId, field.hintKey, `settings field "${field.id}" hintKey`),
+    layout: field.layout,
     min,
     max,
     step,

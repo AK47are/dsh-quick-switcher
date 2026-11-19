@@ -220,6 +220,48 @@ test("each field type validates its own default and range", () => {
     }),
   });
   assert.equal(custom.settings.groups[0].fields[0].type, "custom");
+
+  // A custom field may ask for the full row, and the option must survive the
+  // whitelist rebuild; an unknown layout is a declaration error.
+  const stacked = validateSpec("alpha", {
+    settings: settingsOf({
+      groups: [
+        {
+          fields: [
+            {
+              id: "a",
+              type: "custom",
+              default: 1,
+              layout: "stack",
+              render: () => null,
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  assert.equal(stacked.settings.groups[0].fields[0].layout, "stack");
+  assert.throws(
+    () =>
+      validateSpec("alpha", {
+        settings: settingsOf({
+          groups: [
+            {
+              fields: [
+                {
+                  id: "a",
+                  type: "custom",
+                  default: 1,
+                  layout: "grid",
+                  render: () => null,
+                },
+              ],
+            },
+          ],
+        }),
+      }),
+    /layout/,
+  );
 });
 
 test("commands and slots keep their DSH metadata after validation", () => {

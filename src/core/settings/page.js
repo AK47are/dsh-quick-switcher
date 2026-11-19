@@ -550,9 +550,13 @@ function ModuleBlock({ entry, settings, t, tModule }) {
 
 function FieldRow({ moduleId, field, value, set, tModule }) {
   const title = field.labelKey === undefined ? field.id : tModule(moduleId, field.labelKey);
+  // A field whose control needs the full row (a meter, a free-form input with
+  // its own readout) opts into the stacked layout its module's row class
+  // already supports; the default row keeps the text and control side by side.
+  const stacked = field.layout === "stack";
   return h(
     "div",
-    { className: "dqs-settings-row" },
+    { className: stacked ? "dqs-settings-row dqs-settings-rowStack" : "dqs-settings-row" },
     h(
       "div",
       { className: "dqs-settings-text" },

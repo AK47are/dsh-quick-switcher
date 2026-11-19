@@ -160,6 +160,7 @@ export function SwitcherShell({
     else if (query === "") emptyText = t("panelNoDefaultList");
   }
   const contentShown = view.content !== null;
+  const locked = view.inputLocked === true;
   const contentLookup = contentShown ? mounted.contentFor(view.content.kind) : null;
   const Content = contentLookup?.renderer.content ?? null;
   const footerLookup =
@@ -318,6 +319,27 @@ export function SwitcherShell({
     setSelected(firstContentIndex(next.view.rows));
   };
 
+  /**
+   * A click on the locked input asks to type again.
+   *
+   * The content view owns what leaving means, so it exposes `back`; the shell
+   * only recognizes the gesture. A drag that selected text is the other intent
+   * the same field serves, copying the question, so a non-collapsed selection
+   * stays in the detail and the caret alone leaves it.
+   */
+  const onInputClick = (event) => {
+    if (!contentShown || !locked || typeof view.back !== "function") return;
+    const input = event.currentTarget;
+    if (typeof input.selectionStart === "number" && input.selectionStart !== input.selectionEnd) {
+      return;
+    }
+    try {
+      view.back(panel);
+    } catch (error) {
+      reportViewError("back", error);
+    }
+  };
+
   const onKeyDown = (event) => {
     if (event.nativeEvent?.isComposing || event.isComposing) return;
     const key = event.key;
@@ -395,7 +417,6 @@ export function SwitcherShell({
 
   const hints = [{ keys: ["↑", "↓"], label: t("hintSelect") }, ...view.hints];
   const activeId = rows.length === 0 ? undefined : `dqs-option-${selected}`;
-  const locked = view.inputLocked === true;
 
   const children = [];
   if (rows.length === 0) {
@@ -481,6 +502,7 @@ export function SwitcherShell({
         className: "dqs-input",
         value: query,
         onChange: (event) => onQueryChange(event.target.value),
+        onClick: onInputClick,
         placeholder: view.placeholder,
         "aria-label": view.searchAria,
         // A locked input is a plain text field: it controls no list, and

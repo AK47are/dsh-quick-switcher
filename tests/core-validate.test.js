@@ -352,6 +352,7 @@ test("a mount keeps providers, matchers and dispose and rejects bad shapes", () 
 test("a view fills defaults and rejects duplicate row keys", () => {
   const view = validateView("alpha", "alpha", viewOf());
   assert.equal(view.inputLocked, false);
+  assert.equal(view.back, undefined);
   assert.equal(view.emptyText, null);
   assert.deepEqual(view.hints, []);
   assert.equal(view.content, null);
@@ -392,15 +393,21 @@ test("a view fills defaults and rejects duplicate row keys", () => {
     () => validateView("alpha", "alpha", { rows: [], keydown: 1 }),
     /keydown/,
   );
+  assert.throws(
+    () => validateView("alpha", "alpha", { rows: [], back: 1 }),
+    /back/,
+  );
 });
 
 test("a view keeps row closures and the content descriptor", () => {
   const run = () => {};
+  const back = () => {};
   const view = validateView("alpha", "alpha", {
     rows: [{ key: "a", title: "A", run, action: true, positions: new Set([0]) }],
     content: { kind: "alpha", props: { id: 1 } },
     footer: { kind: "alpha" },
     inputLocked: true,
+    back,
     keydown: () => true,
     count: "1",
   });
@@ -410,6 +417,7 @@ test("a view keeps row closures and the content descriptor", () => {
   assert.deepEqual(view.content.props, { id: 1 });
   assert.deepEqual(view.footer.props, {});
   assert.equal(view.inputLocked, true);
+  assert.equal(view.back, back);
   assert.equal(typeof view.keydown, "function");
   assert.equal(view.count, "1");
 });

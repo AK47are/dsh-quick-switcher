@@ -1164,6 +1164,10 @@ export function createAskView({ api, store, ui, actions }) {
       inputLocked: true,
       hints: [],
       count: "",
+      // The shell calls this when the locked question box is clicked, so the
+      // pointer gesture and `i` leave the detail through the same door. The
+      // view owns `detailId`, which is why the shell cannot do it alone.
+      back: (target) => back(target),
       keydown(event, context) {
         // Read the record again instead of trusting the render: a late chunk
         // may have changed what the record allows since the view was built.

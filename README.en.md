@@ -67,7 +67,7 @@ Type `?` or `？` and the question, then press Enter. The answer streams into th
 - Closing the panel or refreshing aborts generation and keeps the received answer and thinking, marked as stopped; records live in browser local storage and survive a refresh
 - Regenerating clears the answer and thinking, reads the model, level and attachment switch from the current settings, and reads the pending card currently on screen; a fork carries only the question and answer
 - Record storage in Settings defaults to 1 MB and takes any size in MB; the readout shows the space in use and about how many side questions fit, including an estimate before the first record; clearing local records takes two clicks
-- In the detail view, `i` returns to the list, `C` copies, `R` regenerates, `F` forks and `S` stops
+- In the detail view, `i` or a click on the locked question box returns to the list, `C` copies, `R` regenerates, `F` forks and `S` stops
 
 ## Privacy
 

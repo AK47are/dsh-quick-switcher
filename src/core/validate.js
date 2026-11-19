@@ -492,6 +492,9 @@ export function validateView(moduleId, matcherId, view) {
   if (view.keydown !== undefined && typeof view.keydown !== "function") {
     fail(moduleId, `matcher "${matcherId}" keydown must be a function`);
   }
+  if (view.back !== undefined && typeof view.back !== "function") {
+    fail(moduleId, `matcher "${matcherId}" back must be a function`);
+  }
 
   return {
     placeholder: view.placeholder ?? "",
@@ -506,6 +509,7 @@ export function validateView(moduleId, matcherId, view) {
     content: validateDescriptor(moduleId, matcherId, view.content, "content"),
     footer: validateDescriptor(moduleId, matcherId, view.footer, "footer"),
     inputLocked: view.inputLocked === true,
+    back: view.back,
     keydown: view.keydown,
   };
 }

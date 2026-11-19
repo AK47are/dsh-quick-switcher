@@ -439,6 +439,7 @@ test("a history row opens the detail, and back restores the list", () => {
   assert.deepEqual(detail.content, { kind: "ask", props: { id: "r1" } });
   assert.deepEqual(detail.footer, { kind: "ask", props: { id: "r1" } });
   assert.equal(detail.inputLocked, true);
+  assert.equal(typeof detail.back, "function");
   assert.deepEqual(detail.rows, []);
   assert.deepEqual(detail.hints, []);
   assert.equal(detail.count, "");
@@ -451,6 +452,24 @@ test("a history row opens the detail, and back restores the list", () => {
   // The view only sets the lock on the detail; the shell's validator fills the
   // list default.
   assert.equal(back.inputLocked, undefined);
+  assert.equal(back.rows[0].key, "a:q");
+});
+
+test("the detail exposes the same back action a click on the locked input uses", () => {
+  const store = fakeStore([record("r1", { question: "why?" })]);
+  const { view } = askViewOf({ store });
+  const panel = panelOf();
+  const list = view.view({ text: "why?" }, panel);
+  // Only a content view offers a way back; a plain list has nothing to leave.
+  assert.equal(list.back, undefined);
+
+  list.rows[1].run();
+  const detail = view.view({ text: "why?" }, panel);
+  assert.equal(typeof detail.back, "function");
+  detail.back(panel);
+
+  const back = view.view({ text: "why?" }, panel);
+  assert.equal(back.content, undefined);
   assert.equal(back.rows[0].key, "a:q");
 });
 

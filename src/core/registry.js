@@ -404,6 +404,7 @@ export function createRegistry(deps = {}) {
       content: null,
       footer: null,
       inputLocked: false,
+      back: undefined,
       keydown: undefined,
     };
   }

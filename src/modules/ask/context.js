@@ -18,13 +18,18 @@ const MAX_CONTEXT_CHARS = 8000;
  * is labelled read-only by the host later; nothing here is trusted as an
  * instruction.
  *
+ * The result is request input, not record state: the caller reads it when a
+ * question or a regenerate is sent, and the record keeps no copy. The interface
+ * shows the card itself, so a separate label would only be a second description
+ * of the same screen.
+ *
  * `pending` is DSH's unified status value for the current session. It is read
  * from the same source the sidebar uses, so a new interaction kind shows up
  * here as soon as DSH reports it.
  */
-export function buildPendingContext(pending, t, sessionId) {
+export function buildPendingContext(pending, sessionId) {
   if (pending === null || pending === undefined || typeof pending !== "object") {
-    return null;
+    return "";
   }
   const kind = pending.kind;
   if (kind === "approval") {
@@ -35,13 +40,9 @@ export function buildPendingContext(pending, t, sessionId) {
     const body = readCardText(sessionId, "[data-approval-scroll]");
     if (reason !== "") lines.push(`Reason: ${reason}`);
     if (body !== "") lines.push("Visible content:", body);
-    return {
-      text: clipContext(lines.join("\n")),
-      label: `${t("askContextApproval")}${toolName === "" ? "" : ` · ${toolName}`}`,
-    };
+    return clipContext(lines.join("\n"));
   }
   if (kind === "question" || kind === "plan-review") {
-    const label = kind === "question" ? t("askContextQuestion") : t("askContextPlanReview");
     const lines = [
       `Pending interaction: ${kind === "question" ? "question" : "plan review"}`,
     ];
@@ -55,9 +56,9 @@ export function buildPendingContext(pending, t, sessionId) {
       );
       if (body !== "") lines.push("Visible content:", body);
     }
-    return { text: clipContext(lines.join("\n")), label };
+    return clipContext(lines.join("\n"));
   }
-  return null;
+  return "";
 }
 
 /**
@@ -131,7 +132,7 @@ function readCardText(sessionId, selector) {
   }
 }
 
-/** Truncate the background with a marker the model and the reader can see. */
+/** Truncate the background with a marker the model can see. */
 function clipContext(text) {
   if (text.length <= MAX_CONTEXT_CHARS) return text;
   return `${text.slice(0, MAX_CONTEXT_CHARS)}\n……（背景已截断）`;

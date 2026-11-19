@@ -57,8 +57,7 @@ function record(id, overrides = {}) {
     sessionId: "s1",
     question: "question",
     answer: "",
-    context: "",
-    contextLabel: "",
+    reasoning: "",
     model: "",
     usage: null,
     status: "done",
@@ -88,16 +87,14 @@ function fakeStore(initial = []) {
     find(id) {
       return records.get(id) ?? null;
     },
-    ask(sessionId, question, background) {
+    ask(sessionId, question, context) {
       const created = record(`r${records.size + 1}`, {
         sessionId,
         question,
         status: "running",
-        context: background?.text ?? "",
-        contextLabel: background?.label ?? "",
       });
       records.set(created.id, created);
-      store.calls.push({ sessionId, question, background });
+      store.calls.push({ sessionId, question, context });
       return created;
     },
     abortSession(sessionId) {
@@ -317,7 +314,7 @@ test("?text puts the ask row first and sends the whole text", () => {
   assert.equal(store.calls.length, 1);
   assert.equal(store.calls[0].sessionId, "s1");
   assert.equal(store.calls[0].question, "hello world");
-  assert.equal(store.calls[0].background, null);
+  assert.equal(store.calls[0].context, "");
   assert.deepEqual(panel.queries, ["?hello world"]);
   assert.ok(panel.notifications > 0);
 
@@ -381,8 +378,9 @@ test("the ask row carries the pending interaction as read-only background", () =
   const result = view.view({ text: "why" }, panel);
   result.rows[0].run();
 
-  assert.equal(store.calls[0].background.label, "askContextApproval · Bash");
-  assert.match(store.calls[0].background.text, /Tool: Bash/);
+  assert.match(store.calls[0].context, /^Pending interaction: approval/u);
+  assert.match(store.calls[0].context, /Tool: Bash/u);
+  assert.match(store.calls[0].context, /Reason: needs it/u);
 });
 
 test("records list newest first, each with its state", () => {
@@ -784,18 +782,16 @@ test("a fork already in flight does not ask the host twice", async () => {
 
 // Pending-interaction background.
 
-test("an approval pending card becomes the labelled background", () => {
+test("an approval pending card becomes read-only request text", () => {
   const context = buildPendingContext(
     { kind: "approval", toolName: "Bash", reason: "because" },
-    t,
     "s1",
   );
-  assert.equal(context.label, "askContextApproval · Bash");
-  assert.match(context.text, /^Pending interaction: approval/);
-  assert.match(context.text, /Tool: Bash/);
-  assert.match(context.text, /Reason: because/);
+  assert.match(context, /^Pending interaction: approval/u);
+  assert.match(context, /Tool: Bash/u);
+  assert.match(context, /Reason: because/u);
   // No visible card in a plain Node process, so only the structured part ships.
-  assert.doesNotMatch(context.text, /Visible content/);
+  assert.doesNotMatch(context, /Visible content/u);
 });
 
 test("a structured question keeps its header, detail, and options", () => {
@@ -814,30 +810,49 @@ test("a structured question keeps its header, detail, and options", () => {
         },
       ],
     },
-    t,
     "s1",
   );
-  assert.equal(context.label, "askContextQuestion");
-  assert.match(context.text, /Pending interaction: question/);
-  assert.match(context.text, /Question 1:/);
-  assert.match(context.text, /Header: Pick/);
-  assert.match(context.text, /Question: Which one\?/);
-  assert.match(context.text, /Detail: a detail/);
-  assert.match(context.text, /Options:/);
-  assert.match(context.text, /1\. A: first/);
-  assert.match(context.text, /2\. B/);
+  assert.match(context, /Pending interaction: question/u);
+  assert.match(context, /Question 1:/u);
+  assert.match(context, /Header: Pick/u);
+  assert.match(context, /Question: Which one\?/u);
+  assert.match(context, /Detail: a detail/u);
+  assert.match(context, /Options:/u);
+  assert.match(context, /1\. A: first/u);
+  assert.match(context, /2\. B/u);
 });
 
 test("a plan review without structured questions still names itself", () => {
-  const context = buildPendingContext({ kind: "plan-review" }, t, "s1");
-  assert.equal(context.label, "askContextPlanReview");
-  assert.equal(context.text, "Pending interaction: plan review");
+  const context = buildPendingContext({ kind: "plan-review" }, "s1");
+  assert.equal(context, "Pending interaction: plan review");
 });
 
 test("no pending interaction, or an unknown one, sends no background", () => {
-  assert.equal(buildPendingContext(null, t, "s1"), null);
-  assert.equal(buildPendingContext(undefined, t, "s1"), null);
-  assert.equal(buildPendingContext({ kind: "other" }, t, "s1"), null);
+  assert.equal(buildPendingContext(null, "s1"), "");
+  assert.equal(buildPendingContext(undefined, "s1"), "");
+  assert.equal(buildPendingContext({ kind: "other" }, "s1"), "");
+});
+
+test("regenerating reads the pending card again", () => {
+  const seen = [];
+  const store = fakeStore();
+  store.regenerate = (sessionId, id, context) => {
+    seen.push({ sessionId, id, context });
+    return true;
+  };
+  const actions = createAskActions({
+    api: { t, services: {} },
+    store,
+    ui: createAskUi(fakeTimer()),
+    panel: panelOf({ pending: { kind: "approval", toolName: "Bash", reason: "because" } }),
+    back() {},
+  });
+
+  actions.regenerate(record("r1"));
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].id, "r1");
+  assert.match(seen[0].context, /Tool: Bash/u);
+  assert.match(seen[0].context, /Reason: because/u);
 });
 
 test("the copy feedback window is the documented 1600 ms", () => {

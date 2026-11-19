@@ -807,7 +807,9 @@ test("the fork route records the exchange and returns the child id", async () =>
   const text = appended[0].message.content[0].text;
   assert.match(text, /【侧问】\nwhy\?/u);
   assert.match(text, /【侧问回答】\nbecause/u);
-  assert.match(text, /【侧问背景】/u);
+  // The pending card is request input for the side model, not part of the
+  // exchange the new session keeps; an extra body field is ignored.
+  assert.doesNotMatch(text, /【侧问背景】/u);
 });
 
 test("fork without a session controller answers 501", async () => {

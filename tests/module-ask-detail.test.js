@@ -128,8 +128,6 @@ function makeRecord(overrides = {}) {
     question: "why",
     answer: "见 [示例](https://example.com)",
     reasoning: "",
-    context: "",
-    contextLabel: "",
     model: "deepseek-chat",
     usage: { inputTokens: 10, outputTokens: 5 },
     effort: "",

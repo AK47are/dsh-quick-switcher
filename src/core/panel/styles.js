@@ -439,28 +439,6 @@ export const STYLE = `
         0%, 100% { opacity: 0.25; }
         50% { opacity: 1; }
       }
-      .dqs-ask-context {
-        margin: 0 0 10px;
-        color: var(--dsw-alias-label-secondary);
-        font-size: 12px;
-        line-height: 18px;
-      }
-      .dqs-ask-context summary {
-        cursor: pointer;
-      }
-      .dqs-ask-context pre {
-        max-height: 160px;
-        margin: 6px 0 0;
-        padding: 8px 10px;
-        overflow: auto;
-        border: 0.5px solid var(--dsw-alias-border-l1);
-        border-radius: 8px;
-        background: var(--dsw-alias-bg-layer-2);
-        font-family: inherit;
-        font-size: 12px;
-        line-height: 18px;
-        white-space: pre-wrap;
-      }
       .dqs-ask-error {
         margin: 8px 0 0;
         padding: 8px 10px;

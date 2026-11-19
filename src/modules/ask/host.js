@@ -14,9 +14,11 @@
  * Web client's Trajectory tab folds; they are absent from `deriveMessages()`
  * until the step settles.
  *
- * Both routes accept optional background text describing a pending approval or
- * question, because a text rendering of the session drops the card the user is
- * asking about.
+ * The ask route accepts optional background text describing a pending approval
+ * or question, because a text rendering of the session drops the card the user
+ * is asking about. The client reads that card at request time and keeps no
+ * copy, so the fork route receives only the question and the answer the user
+ * actually read.
  *
  * Nothing here is command-registry based: a host command would append
  * `command/run` and `command/done` events and render a persistent command row,
@@ -300,7 +302,6 @@ async function forkRoute(ctx, request, response) {
   if (answer.length > MAX_ANSWER_CHARS) {
     return sendJson(response, 413, { error: "answer is too large to fork" });
   }
-  const context = normalizeContext(body.context);
   let atSeq;
   if (body.atSeq !== undefined) {
     if (!Number.isSafeInteger(body.atSeq) || body.atSeq < 0) {
@@ -337,7 +338,7 @@ async function forkRoute(ctx, request, response) {
   try {
     child.session.append(
       "user/message",
-      createUserMessage(forkRecord(question, answer, context)),
+      createUserMessage(forkRecord(question, answer)),
       { surfaceOp: "append" },
     );
   } catch (error) {
@@ -348,10 +349,16 @@ async function forkRoute(ctx, request, response) {
   return sendJson(response, 200, { sessionId: childId });
 }
 
-/** Build the one user message a forked session receives for this exchange. */
-function forkRecord(question, answer, context) {
+/**
+ * Build the one user message a forked session receives for this exchange.
+ *
+ * The message carries only what the user read: the question and the answer.
+ * The pending-interaction text is request-time input for the side model, and
+ * the follow-up conversation opens with its own interface state, so replaying
+ * an old card caption here would describe a screen the new session cannot see.
+ */
+function forkRecord(question, answer) {
   const parts = ["以下是从主对话中分出来的侧问记录，仅作为继续讨论的上下文。", ""];
-  if (context !== "") parts.push("【侧问背景】", context, "");
   parts.push("【侧问】", question, "", "【侧问回答】", answer);
   return parts.join("\n");
 }

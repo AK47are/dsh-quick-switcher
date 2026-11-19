@@ -366,7 +366,7 @@ export function createAskStore({
     return { provider, model, effort };
   }
 
-  function createRecord(sessionId, question, context) {
+  function createRecord(sessionId, question) {
     return {
       id: `ask-${nextId++}`,
       sessionId,
@@ -375,8 +375,6 @@ export function createAskStore({
       // Reasoning is the model's own thinking for this answer. It is shown in
       // the detail but never copied, forked, or sent back with a new question.
       reasoning: "",
-      context: typeof context?.text === "string" ? context.text : "",
-      contextLabel: typeof context?.label === "string" ? context.label : "",
       // Preferences are captured at question time, so regenerate replays the
       // same snapshot policy instead of silently adopting a newer setting.
       includeAttachments: includeAttachments() !== false,
@@ -395,11 +393,18 @@ export function createAskStore({
     };
   }
 
-  /** Open the stream for one record and let it settle in the background. */
-  function start(record) {
+  /**
+   * Open the stream for one record and let it settle in the background.
+   *
+   * `context` is the pending-interaction text read for this attempt. It is
+   * request input, like the session snapshot, not record state: the store does
+   * not keep it, so a regenerate after the card changed sends what is on screen
+   * now instead of what the first attempt saw.
+   */
+  function start(record, context) {
     const controller = new AbortController();
     controllers.set(record.id, controller);
-    void runStream(record.id, controller);
+    void runStream(record.id, controller, context);
   }
 
   /**
@@ -410,7 +415,7 @@ export function createAskStore({
    * known to be incomplete. A client-side abort is different: the record was
    * already marked stopped, so the catch returns without overwriting it.
    */
-  async function runStream(id, controller) {
+  async function runStream(id, controller, context) {
     const record = find(id);
     if (record === null) return;
     const body = {
@@ -423,7 +428,7 @@ export function createAskStore({
       body.model = record.choice.model;
     }
     if (record.choice.effort !== "") body.reasoningEffort = record.choice.effort;
-    if (record.context !== "") body.context = record.context;
+    if (typeof context === "string" && context !== "") body.context = context;
     try {
       const response = await request(ASK_PATH, body, controller.signal);
       if (response.ok !== true) throw new Error(await refusalOf(response));
@@ -568,13 +573,13 @@ export function createAskStore({
     const text = String(question ?? "").trim();
     if (text === "") return null;
     if (runningOf(sessionId) !== null) return null;
-    const record = createRecord(sessionId, text, context);
+    const record = createRecord(sessionId, text);
     items.unshift(record);
     trimRecords(sessionId);
     trimSessions();
     // The list shows the new row before the first byte arrives.
     emit();
-    start(record);
+    start(record, context);
     return record;
   }
 
@@ -599,8 +604,15 @@ export function createAskStore({
     }
   }
 
-  /** Ask the same question with the same background once more, in place. */
-  function regenerate(sessionId, id) {
+  /**
+   * Ask the same question again in place, with the context seen right now.
+   *
+   * The pending card is request input, not record state, so the regenerated
+   * answer explains the interaction the user is actually looking at. A live
+   * record's earlier attempt may have been about a card that has since been
+   * resolved; reusing that stale text would explain the wrong screen.
+   */
+  function regenerate(sessionId, id, context) {
     const record = find(id);
     if (record === null || record.status === "running") return false;
     const next = patch(id, {
@@ -617,7 +629,7 @@ export function createAskStore({
       effortName: "",
     });
     if (next === null) return false;
-    start(next);
+    start(next, context);
     return true;
   }
 
@@ -637,7 +649,6 @@ export function createAskStore({
       answer: record.answer.trim(),
     };
     if (typeof record.atSeq === "number") body.atSeq = record.atSeq;
-    if (record.context !== "") body.context = record.context;
     const response = await request(FORK_PATH, body);
     const payload = await response.json().catch(() => null);
     if (
@@ -865,9 +876,20 @@ export function createAskActions({ api, store, ui, panel, back }) {
     store.stop(record.sessionId, record.id);
   }
 
+  /**
+   * Regenerate with the card the user is looking at now.
+   *
+   * `panel.pending` is a live getter over the latest session status, so the
+   * retry reads the card that is on screen then, not the one captured when the
+   * record was first created.
+   */
   function regenerate(record) {
     if (record === null || record === undefined) return;
-    store.regenerate(record.sessionId, record.id);
+    store.regenerate(
+      record.sessionId,
+      record.id,
+      buildPendingContext(panel.pending, record.sessionId),
+    );
   }
 
   async function fork(record) {
@@ -1046,7 +1068,7 @@ export function createAskView({ api, store, ui, actions }) {
                 const record = store.ask(
                   currentId,
                   text,
-                  buildPendingContext(panel.pending, api.t, currentId),
+                  buildPendingContext(panel.pending, currentId),
                 );
                 if (record === null || record === undefined) return;
                 detailId = record.id;

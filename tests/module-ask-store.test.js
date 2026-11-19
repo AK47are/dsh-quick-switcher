@@ -432,7 +432,31 @@ test("at most eight sessions keep records", async () => {
   }
 });
 
-test("fork posts the question, visible answer, prefix, and background", async () => {
+test("regenerating sends the context it is given, not the first attempt's", async () => {
+  const seen = [];
+  const store = createAskStore({
+    request: async (path, body) => {
+      seen.push(body);
+      return responseOf(heldStream(sse({ type: "done" })));
+    },
+    now: () => 0,
+  });
+
+  const record = store.ask("s1", "q", "first card");
+  await flush();
+  assert.equal(seen[0].context, "first card");
+
+  store.regenerate("s1", record.id, "second card");
+  await flush();
+  assert.equal(seen[1].context, "second card");
+
+  // No card on screen means no context field at all.
+  store.regenerate("s1", record.id, "");
+  await flush();
+  assert.equal("context" in seen[2], false);
+});
+
+test("fork posts the question, visible answer, prefix, and no background", async () => {
   const seen = [];
   const store = createAskStore({
     request: async (path, body) => {
@@ -454,21 +478,23 @@ test("fork posts the question, visible answer, prefix, and background", async ()
     now: () => 0,
   });
 
-  const record = store.ask("s1", "why?", { text: "background", label: "Approval" });
+  const record = store.ask("s1", "why?", "background");
   await flush();
   assert.equal(canFork(store.find(record.id)), true);
   assert.equal(store.find(record.id).reasoning, "thinking");
+  // The pending-interaction text is request input, not record state.
+  assert.equal("context" in store.find(record.id), false);
 
   const child = await store.fork("s1", record.id);
   assert.equal(child, "child");
   assert.equal(seen[1].path, FORK_PATH);
-  // Reasoning is a process, not part of the exchange the new session keeps.
+  // Reasoning is a process, not part of the exchange the new session keeps,
+  // and the pending card belongs to the screen the fork leaves behind.
   assert.deepEqual(seen[1].body, {
     sessionId: "s1",
     question: "why?",
     answer: "hi",
     atSeq: 4,
-    context: "background",
   });
 });
 

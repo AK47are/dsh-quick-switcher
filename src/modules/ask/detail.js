@@ -320,14 +320,6 @@ export function AskDetail({ descriptor, instance, t }) {
     badges.length === 0
       ? null
       : h("div", { className: "dqs-ask-status" }, badges),
-    record.context === ""
-      ? null
-      : h(
-          "details",
-          { className: "dqs-ask-context" },
-          h("summary", null, `${t("askContextAttached")}${record.contextLabel}`),
-          h("pre", null, record.context),
-        ),
     reasoning === ""
       ? null
       : AskThinkingBlock({

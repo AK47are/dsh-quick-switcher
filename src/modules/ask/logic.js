@@ -111,8 +111,8 @@ export function canCopy(record) {
 /**
  * Whether the same question can be asked again.
  *
- * Stopped and failed records qualify: their question and pinned choice are
- * still the ones the user wants to retry, and the pending card is read again
+ * Stopped and failed records qualify: their question is still the one the user
+ * wants to retry, and both the preferences and the pending card are read again
  * when the retry is sent. The running record does not, because the store allows
  * one request per session.
  */
@@ -428,12 +428,14 @@ export function createAskStore({
   }
 
   /**
-   * Read the pinned model choice once, at question time.
+   * Read the pinned model choice for one request.
    *
-   * A provider without a model is not a choice: it means the host follows the
-   * session, so both strings are cleared together. The effort always has a
-   * value, because the lowest level is the setting's default and the host needs
-   * the intent even when no model is pinned.
+   * Called when a record is created and again when it is regenerated, because
+   * the setting is the current intent: a change made after the first ask has to
+   * reach the next attempt. A provider without a model is not a choice: it
+   * means the host follows the session, so both strings are cleared together.
+   * The effort always has a value, because the lowest level is the setting's
+   * default and the host needs the intent even when no model is pinned.
    */
   function captureChoice() {
     let raw;
@@ -459,8 +461,9 @@ export function createAskStore({
       // Reasoning is the model's own thinking for this answer. It is shown in
       // the detail but never copied, forked, or sent back with a new question.
       reasoning: "",
-      // Preferences are captured at question time, so regenerate replays the
-      // same snapshot policy instead of silently adopting a newer setting.
+      // The preferences the latest request used. `regenerate` reads them again
+      // and rewrites both fields, so a record never pins the settings of an
+      // older attempt.
       includeAttachments: includeAttachments() !== false,
       choice: captureChoice(),
       // What the host actually ran: the session's model when none is pinned, and
@@ -704,12 +707,16 @@ export function createAskStore({
   }
 
   /**
-   * Ask the same question again in place, with the context seen right now.
+   * Ask the same question again in place, with the preferences and context seen
+   * right now.
    *
-   * The pending card is request input, not record state, so the regenerated
-   * answer explains the interaction the user is actually looking at. A live
-   * record's earlier attempt may have been about a card that has since been
-   * resolved; reusing that stale text would explain the wrong screen.
+   * The pinned model, level, and attachment switch are read again rather than
+   * replayed from the first attempt: the settings are the current intent, so a
+   * change made after the first ask applies here. The pending card is request
+   * input too, not record state, so the regenerated answer explains the
+   * interaction the user is actually looking at. A live record's earlier attempt
+   * may have been about a card that has since been resolved; reusing that stale
+   * text would explain the wrong screen.
    */
   function regenerate(sessionId, id, context) {
     const record = find(id);
@@ -720,8 +727,13 @@ export function createAskStore({
       usage: null,
       error: null,
       status: "running",
-      // The pinned choice is replayed as-is; the effective model and level are
-      // cleared until the host's start event names what this attempt ran.
+      // The preferences of this attempt, not of the first ask. The updated
+      // values become the policy of the latest request, so a second regenerate
+      // after another settings change follows that change too.
+      includeAttachments: includeAttachments() !== false,
+      choice: captureChoice(),
+      // The effective model and level stay empty until the host's start event
+      // names what this attempt actually ran.
       provider: "",
       model: "",
       effort: "",

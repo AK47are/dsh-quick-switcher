@@ -294,7 +294,7 @@ test("regenerating clears the answer and asks the same question again", async ()
   assert.equal(seen[1].body.includeAttachments, true);
 });
 
-test("the settings reader is consulted at question time, not at import time", async () => {
+test("the attachment preference is read at question time and again on regenerate", async () => {
   let include = false;
   const seen = [];
   const store = createAskStore({
@@ -310,11 +310,13 @@ test("the settings reader is consulted at question time, not at import time", as
   await flush();
   assert.equal(seen[0].body.includeAttachments, false);
 
-  // Changing the setting later must not rewrite an existing record.
+  // The switch is the current intent, so a change applies to the retry and the
+  // record keeps the policy of its latest request.
   include = true;
   assert.equal(store.regenerate("s1", record.id), true);
   await flush();
-  assert.equal(seen[1].body.includeAttachments, false);
+  assert.equal(seen[1].body.includeAttachments, true);
+  assert.equal(store.find(record.id).includeAttachments, true);
 
   const next = store.ask("s1", "q2");
   await flush();
@@ -322,7 +324,7 @@ test("the settings reader is consulted at question time, not at import time", as
   assert.equal(seen[2].body.includeAttachments, true);
 });
 
-test("the pinned model and level are captured and replayed on regenerate", async () => {
+test("the pinned model and level are read again on regenerate", async () => {
   let choice = { provider: "q", model: "claude", effort: "low" };
   const seen = [];
   const store = createAskStore({
@@ -358,15 +360,20 @@ test("the pinned model and level are captured and replayed on regenerate", async
   assert.equal(store.find(record.id).provider, "q");
   assert.equal(store.find(record.id).effortName, "Low");
 
-  // Changing the setting later must not rewrite an existing record.
+  // The setting changed after the first ask, so the retry follows it: no pinned
+  // model and only a level. The record's captured values move with the request.
   choice = { provider: "", model: "", effort: "max" };
   assert.equal(store.regenerate("s1", record.id), true);
   await flush();
-  assert.equal(seen[1].body.provider, "q");
-  assert.equal(seen[1].body.model, "claude");
-  assert.equal(seen[1].body.reasoningEffort, "low");
+  assert.equal("provider" in seen[1].body, false);
+  assert.equal("model" in seen[1].body, false);
+  assert.equal(seen[1].body.reasoningEffort, "max");
+  assert.deepEqual(store.find(record.id).choice, { provider: "", model: "", effort: "max" });
+  // The status line still shows what the host ran, not what the setting asked.
+  assert.equal(store.find(record.id).provider, "q");
+  assert.equal(store.find(record.id).effortName, "Low");
 
-  // The next question follows the new setting: no pinned model, only a level.
+  // The next question follows the same new setting.
   assert.notEqual(store.ask("s1", "q2"), null);
   await flush();
   assert.equal("provider" in seen[2].body, false);

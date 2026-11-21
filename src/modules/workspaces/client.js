@@ -1,6 +1,7 @@
 /* Workspace module: the "+" list and the scoped session list. */
 
 import { defineModule } from "../../core/module.js";
+import { parentWithSeparator } from "../../core/lib/paths.js";
 import { filterEntries } from "../../core/lib/search.js";
 import { locale } from "./locale.js";
 
@@ -95,8 +96,16 @@ export default defineModule("workspaces", (api) => {
               selectedKey: scopeStartKey(entry, snapshot().currentId),
             });
           },
+          // Shift+Enter used to start a session here. Starting a workspace next
+          // to this one is the first half of the same intent, and the "=" mode
+          // offers the directory listing the old action had no room for.
           shiftRun() {
-            startSession(panel, entry.workspaceId);
+            const parent = parentWithSeparator(entry.path);
+            if (parent === null) {
+              panel.setError(api.t("workspacePathFailed"));
+              return;
+            }
+            panel.setQuery(`=${parent}`);
           },
         }));
         return {
@@ -108,7 +117,7 @@ export default defineModule("workspaces", (api) => {
           note: null,
           hints: [
             { keys: ["Enter"], label: api.t("hintViewSessions") },
-            { keys: ["Shift+Enter"], label: api.t("hintNewSession") },
+            { keys: ["Shift+Enter"], label: api.t("hintNewWorkspace") },
             { keys: ["Esc"], label: api.t("hintClose") },
           ],
           count: api.t("countWorkspaces", { count: rows.length }),

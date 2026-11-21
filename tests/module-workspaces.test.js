@@ -110,7 +110,7 @@ test("only the plus prefix claims the query", () => {
   assert.deepEqual(state, { mode: "list", filter: "" });
 });
 
-test("the workspace list filters, remembers the id and starts on shift", () => {
+test("the workspace list filters, remembers the id and enters the new-workspace mode on shift", () => {
   const harness = createHarness();
   harness.publish();
   const state = harness.matcher.match("+");
@@ -127,9 +127,12 @@ test("the workspace list filters, remembers the id and starts on shift", () => {
     options: { selectedKey: "s:s1" },
   });
 
+  // Shift now seeds the parent directory of the highlighted workspace; the
+  // directory drill and the registration itself belong to the "=" mode.
   view.rows[0].shiftRun();
-  assert.deepEqual(harness.calls.started, ["w1"]);
-  assert.deepEqual(harness.panel.closed, { restoreFocus: false });
+  assert.equal(harness.panel.query.query, "=/");
+  assert.deepEqual(harness.calls.started, []);
+  assert.equal(harness.panel.closed, undefined);
 });
 
 test("entering a workspace lists its sessions and a create row", () => {
@@ -228,16 +231,11 @@ test("a start failure keeps the panel open and reports the error", () => {
   harness.api.services.uiWorkspace.startSession = () => {
     throw new Error("no");
   };
-  const list = harness.matcher.match("+");
-  const view = harness.matcher.view(list, harness.panel);
-  view.rows[0].shiftRun();
-  assert.equal(harness.panel.error, "createFailed");
-  assert.equal(harness.panel.closed, undefined);
-
   const scope = harness.matcher.match("+Work ");
   const scopeView = harness.matcher.view(scope, harness.panel);
   scopeView.rows[0].run();
   assert.equal(harness.panel.error, "createFailed");
+  assert.equal(harness.panel.closed, undefined);
 });
 
 test("the longest matching title wins when titles overlap", () => {

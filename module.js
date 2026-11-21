@@ -297,6 +297,15 @@ export function suffixMatcher(suffix, options) {
  */
 
 /**
+ * One matcher's rendered surface.
+ *
+ * `keydown` is optional. On a list view it runs before the shell's Tab, arrow,
+ * Enter and digit handling and returns true when the module consumed the key;
+ * the third argument is the row under the caret. Tab is only delivered to a
+ * list view while the input owns the caret, so a moved focus can still cycle.
+ * A content view keeps the letter keys and receives the last highlighted row
+ * for reference.
+ *
  * @typedef {object} PanelView
  * @property {string} [placeholder]
  * @property {string} [searchAria]
@@ -310,7 +319,7 @@ export function suffixMatcher(suffix, options) {
  * @property {ContentDescriptor} [content]
  * @property {ContentDescriptor} [footer]
  * @property {boolean} [inputLocked]
- * @property {(event: KeyboardEvent, panel: PanelContext) => boolean} [keydown]
+ * @property {(event: KeyboardEvent, panel: PanelContext, row?: PanelRow) => boolean} [keydown]
  */
 
 /**

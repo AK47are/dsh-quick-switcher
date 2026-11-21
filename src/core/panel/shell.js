@@ -23,7 +23,9 @@ function firstContentIndex(rows) {
  * keyboard, focus restore, and the frame around the list. It never computes a
  * domain projection; the mounted modules resolve the view from the query and
  * the shell only renders what came back. A view that carries `content` replaces
- * the list, and its module owns the letter keys through `keydown`.
+ * the list, and its module owns the letter keys through `keydown`. A list view
+ * may claim a key the same way before the shared navigation runs, which is how
+ * the "=" path mode turns Tab into a directory drill instead of a focus cycle.
  */
 export function SwitcherShell({
   registry,
@@ -349,6 +351,26 @@ export function SwitcherShell({
       closePanel();
       return;
     }
+    // A list view may claim a key before the shared navigation. The selected
+    // row is the module's only way to know what Tab or another claimed key
+    // should act on; the shell keeps the caret and the row list itself. Tab is
+    // only handed over while the input owns the caret, so a focus that already
+    // reached the close button can still cycle back.
+    if (!contentShown && typeof view.keydown === "function") {
+      const fromInput = key !== "Tab" || document.activeElement === inputRef.current;
+      let handled = false;
+      if (fromInput) {
+        try {
+          handled = view.keydown(event, panel, rows[selected]) === true;
+        } catch (error) {
+          reportViewError("keydown", error);
+        }
+      }
+      if (handled) {
+        event.preventDefault();
+        return;
+      }
+    }
     if (key === "Tab") {
       event.preventDefault();
       // A content view adds its own focusables, so the cycle is read from the
@@ -373,7 +395,9 @@ export function SwitcherShell({
       let handled = false;
       try {
         handled =
-          typeof view.keydown === "function" ? view.keydown(event, panel) === true : false;
+          typeof view.keydown === "function"
+            ? view.keydown(event, panel, rows[selected]) === true
+            : false;
       } catch (error) {
         reportViewError("keydown", error);
       }

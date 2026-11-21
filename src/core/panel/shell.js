@@ -417,6 +417,9 @@ export function SwitcherShell({
 
   const hints = [{ keys: ["↑", "↓"], label: t("hintSelect") }, ...view.hints];
   const activeId = rows.length === 0 ? undefined : `dqs-option-${selected}`;
+  // The jump hint borrows the same platform labels DSH used for the command
+  // shortcuts, so a macOS row never mixes "Alt" with the Option symbol.
+  const shortcutPlatform = services?.shortcuts?.platform;
 
   const children = [];
   if (rows.length === 0) {
@@ -432,6 +435,7 @@ export function SwitcherShell({
           row,
           selected: index === selected,
           index,
+          platform: shortcutPlatform,
           onPointerMove: (event) => {
             if (!hoverGate.current.accept(event.clientX, event.clientY)) return;
             setSelected(index);

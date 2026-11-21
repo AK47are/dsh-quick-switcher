@@ -32,3 +32,23 @@ export function digitRowIndex(event) {
   if (typeof key !== "string" || !/^[1-9]$/u.test(key)) return null;
   return Number(key) - 1;
 }
+
+/**
+ * Format the visible hint for one jump target.
+ *
+ * The hint mirrors the labels DSH already produced for the same platform
+ * instead of inventing a second key style: Windows separates the modifier from
+ * the digit with the same "+" entry used between bound keys, macOS uses the
+ * Option symbol, and Linux keeps the two adjacent. An unknown platform keeps
+ * the old "Alt 1" spelling rather than guessing a separator.
+ *
+ * @param {"windows"|"macos"|"linux"|undefined} platform - receiving device.
+ * @param {number} digit - one-based row number, 1 through 9.
+ * @returns {string[]} chip tokens; "+" is punctuation, not a key.
+ */
+export function jumpKeys(platform, digit) {
+  const number = String(digit);
+  if (platform === "macos") return ["⌥", number];
+  if (platform === "windows") return ["Alt", "+", number];
+  return ["Alt", number];
+}

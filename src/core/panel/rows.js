@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as primitives from "@deepseek-ai/dsh-client-ui-primitives";
+import { jumpKeys } from "./digit-jump.js";
 
 const h = React.createElement;
 
@@ -10,25 +11,23 @@ export function Keycap({ children }) {
 }
 
 /**
- * Render one effective shortcut binding.
+ * Render the tokens of one shortcut binding.
  *
  * DSH already formats the labels for the current platform, including turning
  * the modifier separator into its own "+" entry on Windows. That separator is
- * punctuation rather than a key, so it renders as text instead of a keycap.
+ * punctuation rather than a key, so it renders as text between two key tokens.
+ * The caller owns the capsule around them: a row shows the whole chord as one
+ * piece of metadata, beside the recent mark and the jump hint.
  */
-function Keycaps({ keys }) {
-  return h(
-    "span",
-    { className: "dqs-keys" },
-    keys.map((key, index) =>
-      key === "+"
-        ? h(
-            "span",
-            { key: index, className: "dqs-key-sep", "aria-hidden": true },
-            "+",
-          )
-        : h(Keycap, { key: index }, key),
-    ),
+function keyTokens(keys) {
+  return keys.map((key, index) =>
+    key === "+"
+      ? h(
+          "span",
+          { key: index, className: "dqs-key-sep", "aria-hidden": true },
+          "+",
+        )
+      : h("span", { key: index }, key),
   );
 }
 
@@ -123,15 +122,17 @@ function highlightTitle(text, positions) {
  * One row in the active matcher's list.
  *
  * A matcher decides what to show by filling the uniform row shape; the panel
- * only owns selection, icons, status, badges, click dispatch, and the Alt+digit
- * hint on the first nine rows.
+ * only owns selection, icons, status, badges, click dispatch, and the digit-jump
+ * hint on the first nine rows. The shortcut, the recent mark and the jump hint
+ * are capsules; the footer keeps bordered keycaps for the keys it asks the user
+ * to press.
  *
  * Hover is reported as `pointermove` rather than `mouseenter`: the browser
  * replays enter events for elements that appear under a stationary pointer,
  * so an enter-driven selection would follow the layout instead of the user.
  * The panel decides whether a move is real; the row only reports it.
  */
-export function RowView({ row, selected, index, onPointerMove, onActivate, registerRef }) {
+export function RowView({ row, selected, index, onPointerMove, onActivate, registerRef, platform }) {
   const className = ["dqs-row", selected ? "dqs-row-selected" : "", row.className ?? ""]
     .filter(Boolean)
     .join(" ");
@@ -170,17 +171,19 @@ export function RowView({ row, selected, index, onPointerMove, onActivate, regis
     h(
       "div",
       { className: "dqs-status" },
-      row.keys && row.keys.length > 0 ? h(Keycaps, { keys: row.keys }) : null,
+      row.keys && row.keys.length > 0
+        ? h("kbd", { className: "dqs-chip dqs-shortcut" }, ...keyTokens(row.keys))
+        : null,
       row.status
         ? h(SessionStatusDot, { state: row.status.state, label: row.status.label })
         : null,
-      row.badge ? h("span", { className: "dqs-badge" }, row.badge) : null,
+      row.badge ? h("span", { className: "dqs-chip dqs-badge" }, row.badge) : null,
       row.trailing ? h("span", { className: "dqs-trailing" }, row.trailing) : null,
       index < 9
         ? h(
             "span",
-            { className: "dqs-jump", "aria-hidden": "true" },
-            `Alt ${index + 1}`,
+            { className: "dqs-chip dqs-jump", "aria-hidden": "true" },
+            ...keyTokens(jumpKeys(platform, index + 1)),
           )
         : null,
     ),

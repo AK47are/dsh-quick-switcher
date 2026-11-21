@@ -95,18 +95,26 @@ export const STYLE = `
       .dqs-row-selected {
         background: var(--dsw-alias-bg-layer-2);
       }
-      .dqs-jump {
+      /* Row metadata: one capsule per item, whether it is a whole shortcut,
+         the recent mark, or the digit jump. The footer's dqs-keycap stays a
+         bordered key because it prompts an action rather than describing one. */
+      .dqs-chip {
+        display: inline-flex;
         flex: 0 0 auto;
+        align-items: center;
+        gap: 2px;
         padding: 1px 6px;
+        border: 0;
         border-radius: 999px;
         background: var(--dsw-alias-bg-layer-2);
         color: var(--dsw-alias-label-secondary);
+        font: inherit;
         font-size: 11px;
         font-variant-numeric: tabular-nums;
         line-height: 17px;
         white-space: nowrap;
       }
-      .dqs-row-selected .dqs-jump {
+      .dqs-row-selected .dqs-chip {
         background: var(--dsw-alias-bg-overlay);
       }
       .dqs-row-main {
@@ -215,27 +223,10 @@ export const STYLE = `
         flex: 0 0 auto;
         align-items: center;
       }
-      .dqs-keys {
-        display: inline-flex;
-        flex: 0 0 auto;
-        align-items: center;
-        gap: 2px;
-      }
       .dqs-key-sep {
         color: var(--dsw-alias-label-tertiary);
         font-size: 10px;
         line-height: 1;
-      }
-      .dqs-badge {
-        padding: 1px 6px;
-        border-radius: 999px;
-        background: var(--dsw-alias-bg-layer-2);
-        color: var(--dsw-alias-label-secondary);
-        font-size: 11px;
-        line-height: 17px;
-      }
-      .dqs-row-selected .dqs-badge {
-        background: var(--dsw-alias-bg-overlay);
       }
       .dqs-mark {
         background: transparent;

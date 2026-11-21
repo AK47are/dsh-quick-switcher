@@ -26,11 +26,11 @@
  */
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { isSameOrigin, messageOf, readJsonBody, sendJson } from "../../core/host/http.js";
 import { defineHostModule } from "../../core/host/module.js";
 import { LOWEST_EFFORT, effortNameOf, floorEffort, lowestEffort } from "./models.js";
 import { ASK_EVENTS, ASK_PATH, FORK_PATH, UNLOADED_MESSAGE } from "./shared.js";
 
-const MAX_BODY_BYTES = 262144;
 const MAX_QUESTION_CHARS = 16384;
 const MAX_ANSWER_CHARS = 400000;
 const MAX_CONTEXT_CHARS = 12000;
@@ -1066,81 +1066,7 @@ async function waitForAgent(ctx, sessionId, timeoutMs) {
   }
 }
 
-/** Accept only browser submissions from the page that hosts this server. */
-function isSameOrigin(request) {
-  const origin = request.headers.origin;
-  if (origin === undefined) return true;
-  try {
-    return new URL(origin).host === request.headers.host;
-  } catch {
-    return false;
-  }
-}
-
-/** Read and parse one JSON body with a hard size bound. */
-function readJsonBody(request, maxBytes = MAX_BODY_BYTES) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    let settled = false;
-    request.on("data", (chunk) => {
-      if (settled) return;
-      size += chunk.length;
-      if (size > maxBytes) {
-        settled = true;
-        const error = new Error("request body is too large");
-        error.status = 413;
-        reject(error);
-        request.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    request.on("error", (error) => {
-      if (settled) return;
-      settled = true;
-      reject(error);
-    });
-    request.on("end", () => {
-      if (settled) return;
-      settled = true;
-      try {
-        const text = Buffer.concat(chunks).toString("utf8").trim();
-        resolve(text === "" ? {} : JSON.parse(text));
-      } catch (error) {
-        const failure = new Error(`invalid JSON body: ${messageOf(error)}`);
-        failure.status = 400;
-        reject(failure);
-      }
-    });
-  });
-}
-
-/** Answer one JSON response; `headers` adds route-specific fields. */
-function sendJson(response, status, body, headers = {}) {
-  const payload = JSON.stringify(body);
-  response.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
-    "content-length": Buffer.byteLength(payload),
-    ...headers,
-  });
-  response.end(payload);
-}
-
 /** Map an optional handler error status to an HTTP code. */
 function httpStatusOf(error) {
   return typeof error?.status === "number" ? error.status : 400;
 }
-
-/** Render an unknown thrown value for an HTTP body. */
-function messageOf(error) {
-  if (error instanceof Error) return error.message;
-  try {
-    return String(error);
-  } catch {
-    return "unknown error";
-  }
-}
-
-

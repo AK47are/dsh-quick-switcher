@@ -45,6 +45,18 @@
       },
       "versions": [
         {
+          "version": "1.6.0",
+          "publishTimestamp": 1795257018,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/AK47are/dsh-quick-switcher",
+            "commit": "c1ffc4c8c7b7979d3b6ef0352c2f00f7885fc4ee"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-0"
+          }
+        },
+        {
           "version": "1.5.0",
           "publishTimestamp": 1794985733,
           "source": {

@@ -1,10 +1,10 @@
 {
   "name": "dsh-quick-switcher",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": false,
   "type": "module",
   "main": "./host.js",
-  "description": "One search surface for DeepSeek Harness Web: switch sessions, browse workspaces, run commands, refill input history, jump to main panels, open workspace files, and ask a side question that never enters the main conversation.",
+  "description": "One search surface for DeepSeek Harness Web: switch sessions, browse workspaces, create a workspace from a directory path, run commands, refill input history, jump to main panels, open workspace files, recover archived sessions, and ask a side question that never enters the main conversation.",
   "license": "MIT",
   "author": "AK47are <54732151+AK47are@users.noreply.github.com>",
   "repository": {

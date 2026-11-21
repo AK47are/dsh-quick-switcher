@@ -1,6 +1,6 @@
 English | [中文](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.md)
 
-Quick switcher turns one input box into the search surface for the whole DSH session: jump between sessions and workspaces, create a workspace from a directory path, run any application command, refill the prompt box from your history, open a main panel, preview workspace files, and ask a side question that never enters the main conversation. It is keyboard first, and every mode can be switched off in Settings.
+Quick switcher turns one input box into the search surface for the whole DSH session: jump between sessions and workspaces, create a workspace from a directory path, run any application command, refill the prompt box from your history, open a main panel, preview workspace files, recover archived sessions, and ask a side question that never enters the main conversation. It is keyboard first, and every mode can be switched off in Settings.
 
 ![The command mode over a session page](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/overview.png)
 
@@ -18,8 +18,9 @@ Each mode is a list behind the same input box, and a trigger character at the st
 | `#` | Main panels | Plugins, Automation tasks and any other full-page panel |
 | `@` | Files | files under the current session working directory |
 | `?`, `？`, `﹖`, `︖` | Side question | side-question records; the text after the mark is the question |
+| `~`, `～` | Archive | archived top-level sessions; Enter unarchives and opens, Shift+Enter only unarchives |
 
-The side-question trigger also works at the end of the input, so `what changed?` asks a question while `@file?` still filters files. The other triggers only count at the very start.
+The side-question trigger also works at the end of the input, so `what changed?` asks a question while `@file?` still filters files. The other triggers only count at the very start; the archive trigger also accepts the fullwidth `～`.
 
 Shift+Enter on a workspace row enters the `=` mode with that workspace's parent directory; the path stays editable, Tab enters a subdirectory, and Enter registers it and opens a new session.
 
@@ -51,6 +52,7 @@ Press Ctrl+Shift+K to open the panel, type to filter, move with the arrow keys, 
 
 - The first row is always the previous session, so Enter right after opening jumps back
 - Shift+Enter on a workspace row enters the new-workspace mode with its parent directory; a missing directory is created first
+- Type `~` to list archived sessions; Enter unarchives and opens, Shift+Enter only unarchives
 - The capsule on the right of the first nine rows shows the platform's jump hint: Alt + 1 to Alt + 9 on Windows, and ⌥ 1 to ⌥ 9 on macOS; press the matching combination to run that row
 - The first visible row always carries Alt + 1 (⌥ 1 on macOS), and rows past the ninth have no jump hint
 - Every mode with an entry command registers "Quick switcher: <mode>", unbound by default
@@ -89,7 +91,7 @@ Apart from the model request a side question makes, the plugin sends nothing.
 - DSH Web only; there is no TUI surface
 - Side question needs a configured model provider
 - Several features read DSH internals, so a DSH release that renames them can break a mode until it is updated
-- Archives, blank drafts and subagent sessions never appear, and browser-local state does not follow you to another browser
+- Archived sessions never appear in the default and workspace lists, only in the `~` archive mode; blank drafts and subagent sessions never appear in any list; and browser-local state does not follow you to another browser
 - Two DSH windows write their own record snapshots, so the later write replaces the earlier one; a refresh interrupts the streaming side question, which can only be reopened as stopped
 
 ## Documentation

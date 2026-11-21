@@ -70,7 +70,11 @@ function createHarness() {
     locale: { getSnapshot: () => active, subscribe: () => () => {} },
     shortcuts: { catalog, config, registry: { commands: new Map() } },
     sessions: { binding: () => undefined },
-    uiWorkspace: { openSession: () => true, startSession: () => true },
+    uiWorkspace: {
+      openSession: () => true,
+      startSession: () => true,
+      unarchiveSession: () => true,
+    },
     layout: { selectPanel: () => {} },
   };
 
@@ -141,7 +145,7 @@ function panelOf(services) {
 
 test("the real client manifest registers every module and its contributions", async () => {
   const modules = await loadClientModules();
-  assert.equal(modules.length, 8);
+  assert.equal(modules.length, 9);
 
   const harness = createHarness();
   for (const definition of modules) {
@@ -152,6 +156,7 @@ test("the real client manifest registers every module and its contributions", as
     harness.registry.modules().map((module) => module.id),
     [
       "sessions",
+      "archive",
       "workspaces",
       "new-workspace",
       "commands",
@@ -163,7 +168,7 @@ test("the real client manifest registers every module and its contributions", as
   );
   assert.deepEqual(
     harness.registry.modules().map((module) => module.order),
-    [10, 20, 25, 30, 40, 50, 60, 70],
+    [10, 15, 20, 25, 30, 40, 50, 60, 70],
   );
   assert.deepEqual(
     harness.registry.settingsGroups().map((entry) => entry.moduleId),
@@ -178,6 +183,7 @@ test("the real client manifest registers every module and its contributions", as
   );
   assert.deepEqual(commands, [
     "quickSwitcher.mode.sessions",
+    "quickSwitcher.mode.archive",
     "quickSwitcher.mode.workspaces",
     "quickSwitcher.mode.new-workspace",
     "quickSwitcher.mode.commands",
@@ -193,6 +199,7 @@ test("the real client manifest registers every module and its contributions", as
     harness.registry.modules().map((module) => [module.id, module.entry?.seed ?? null]),
     [
       ["sessions", ""],
+      ["archive", "~"],
       ["workspaces", "+"],
       ["new-workspace", "="],
       ["commands", ">"],
@@ -207,7 +214,10 @@ test("the real client manifest registers every module and its contributions", as
       .modules()
       .filter((module) => module.dependencies.length > 0)
       .map((module) => [module.id, module.dependencies]),
-    [["workspaces", ["sessions"]]],
+    [
+      ["archive", ["sessions"]],
+      ["workspaces", ["sessions"]],
+    ],
   );
   for (const module of harness.registry.modules()) {
     assert.equal(typeof module.descriptionKey, "string", `description for ${module.id}`);
@@ -242,6 +252,10 @@ test("the real client manifest registers every module and its contributions", as
     ["#why?", "panels"],
     ["+why?", "workspaces"],
     ["=why?", "new-workspace"],
+    ["~", "archive"],
+    ["～", "archive"],
+    ["~why?", "archive"],
+    ["～why?", "archive"],
     ["?why?", "ask"],
   ];
   for (const [query, matcherId] of claims) {
@@ -281,9 +295,9 @@ test("the real client manifest registers every module and its contributions", as
       tModule: (moduleId, key, params) => harness.translator.t(moduleId, key, params),
     });
   const model = buildModel();
-  assert.equal(model.modules.length, 8);
+  assert.equal(model.modules.length, 9);
   assert.equal(model.general.defaultMode.value, "sessions");
-  assert.equal(model.general.defaultMode.options.length, 8);
+  assert.equal(model.general.defaultMode.options.length, 9);
   assert.equal(model.general.defaultMode.warning, null);
   assert.deepEqual(
     model.groups.map((entry) => [entry.moduleId, entry.isEnabled]),

@@ -73,16 +73,17 @@ test("visible sessions are projected with current, pinned and status order", () 
   );
 });
 
-test("archived, blank and subagent generations are excluded", () => {
+test("archived sessions go to their own list while blank and subagent rows stay out", () => {
   const list = sessionList([
     { id: "s1", title: "One", updatedAt: 1000 },
     { id: "s2", title: "Blank", blank: true },
     { id: "s3", title: "Child", parentId: "s1" },
     { id: "s4", title: "Sub", origin: "subagent" },
-    { id: "s5", title: "Archived" },
+    { id: "s5", title: "Archived old", updatedAt: 2000 },
+    { id: "s6", title: "Archived new", updatedAt: 3000 },
   ]);
-  const workspaceList = workspacesOf(["s1", "s2", "s3", "s4", "s5"]);
-  workspaceList.archivedSessionIds = ["s5"];
+  const workspaceList = workspacesOf(["s1", "s2", "s3", "s4", "s5", "s6"]);
+  workspaceList.archivedSessionIds = ["s2", "s3", "s4", "s5", "s6"];
   const data = projectSessionData({
     sessionList: list,
     workspaceList,
@@ -95,6 +96,17 @@ test("archived, blank and subagent generations are excluded", () => {
     data.entries.map((entry) => entry.id),
     ["s1"],
   );
+  // Archiving does not make a blank, child or subagent row searchable: those
+  // have no conversation of their own, so the archive list skips them too.
+  assert.deepEqual(
+    data.archivedEntries.map((entry) => entry.id),
+    ["s6", "s5"],
+  );
+  const newest = data.archivedEntries[0];
+  assert.equal(newest.workspace, "Work");
+  assert.equal(newest.status.state, "idle");
+  assert.equal(newest.lastAccessAt, 0);
+  assert.equal(newest.recentAt, 3000);
 });
 
 test("a main panel makes every session non-current and unpins nothing", () => {
@@ -273,7 +285,11 @@ test("the default view filters the shared entries and exposes every mode hint", 
   assert.equal(all.rows.length, 2);
   assert.equal(all.placeholder, "placeholder");
   assert.equal(all.count, "count:2");
-  assert.equal(all.hints.length, 8);
+  assert.equal(all.hints.length, 10);
+  assert.deepEqual(
+    all.hints.map((hint) => hint.keys[0]),
+    ["Enter", "Esc", "+", "=", ">", "@", "!", "#", "~", "?"],
+  );
   const filtered = view({ filter: "beta" }, panel);
   assert.deepEqual(
     filtered.rows.map((row) => row.key),

@@ -129,14 +129,31 @@ function comparePendingByLeastRecentVisit(left, right) {
 }
 
 /**
+ * Status for an archived row.
+ *
+ * DSH stops an archived session and the sidebar hides its dot, so a row in the
+ * archive list must not claim a live state either. The shared object is safe to
+ * reuse because the row builder only reads it.
+ */
+const IDLE_STATUS = Object.freeze({
+  state: "idle",
+  kind: "idle",
+  labelKey: "statusIdle",
+  compactKey: null,
+  subagentCount: 0,
+});
+
+/**
  * Build the searchable session entries.
  *
- * Archived, blank, and subagent generations are excluded: the first is hidden
- * by the sidebar, the second has no conversation to switch to, and the third
- * belongs to its parent. The empty-query order is the switcher's own: the
- * previous session leads, then the status rank, then the last time the plugin
- * saw the row. The pending group is the exception under the default
- * preference; see `comparePendingByLeastRecentVisit`.
+ * Blank and subagent generations are excluded from both lists: the first has no
+ * conversation to switch to, and the second belongs to its parent. Archived
+ * sessions go to their own list instead of the default one; DSH keeps their
+ * rows, so a caller can search them without mixing them back in. The empty
+ * query order of the default list is the switcher's own: the previous session
+ * leads, then the status rank, then the last time the plugin saw the row. The
+ * pending group is the exception under the default preference; see
+ * `comparePendingByLeastRecentVisit`.
  */
 export function collectSessionEntries(
   sessionList,
@@ -167,15 +184,42 @@ export function collectSessionEntries(
   const currentId = isPanelActive ? null : retainedId;
 
   const entries = [];
+  const archivedEntries = [];
   for (const id of sessionList?.ids ?? []) {
     const row = byId[id];
     if (!row) continue;
-    if (row.blank || row.parentId || row.origin === "subagent" || archived.has(id)) continue;
+    if (row.blank || row.parentId || row.origin === "subagent") continue;
 
     const workspace = workspaceBySession.get(id);
     const title = cleanTitle(row.displayTitle || row.title, id);
-    const subagentCount = runningChildCount(sessionList, id, statuses);
     const updatedAt = toMillis(row.updatedAt);
+    const metaLower =
+      `${workspace?.title ?? ""} ${workspace?.path ?? row.cwd ?? ""}`.toLocaleLowerCase();
+
+    if (archived.has(id)) {
+      // An archived session cannot run, so its row carries no live status.
+      // `recentAt` mirrors `updatedAt` because the archive set has no timestamp
+      // of its own; the row's time label and the list order then agree.
+      archivedEntries.push({
+        id,
+        idKey: idKeyOf(id),
+        shortId: shortIdOf(id),
+        title,
+        titleLower: title.toLocaleLowerCase(),
+        workspace: workspace?.title ?? "",
+        path: workspace?.path ?? String(row.cwd ?? ""),
+        metaLower,
+        updatedAt,
+        lastAccessAt: 0,
+        recentAt: updatedAt,
+        status: IDLE_STATUS,
+        current: false,
+        pinned: false,
+      });
+      continue;
+    }
+
+    const subagentCount = runningChildCount(sessionList, id, statuses);
     const lastAccessAt = accessTimes?.get?.(id) ?? 0;
     entries.push({
       id,
@@ -185,7 +229,7 @@ export function collectSessionEntries(
       titleLower: title.toLocaleLowerCase(),
       workspace: workspace?.title ?? "",
       path: workspace?.path ?? String(row.cwd ?? ""),
-      metaLower: `${workspace?.title ?? ""} ${workspace?.path ?? row.cwd ?? ""}`.toLocaleLowerCase(),
+      metaLower,
       updatedAt,
       lastAccessAt,
       recentAt: lastAccessAt > 0 ? lastAccessAt : updatedAt,
@@ -194,6 +238,13 @@ export function collectSessionEntries(
       pinned: false,
     });
   }
+
+  // The archive set is append-only, so archive time is not recoverable; the
+  // newest conversation leads instead, matching the relative time each row
+  // prints.
+  archivedEntries.sort(
+    (left, right) => right.updatedAt - left.updatedAt || compareIds(left, right),
+  );
 
   let pinned = null;
   for (const entry of entries) {
@@ -221,7 +272,7 @@ export function collectSessionEntries(
     if (left.recentAt !== right.recentAt) return right.recentAt - left.recentAt;
     return compareIds(left, right);
   });
-  return { entries, currentId };
+  return { entries, archivedEntries, currentId };
 }
 
 /**
@@ -272,7 +323,7 @@ export function projectSessionData({
   pendingOrder,
 }) {
   const isPanelActive = activePanelId !== null && activePanelId !== undefined;
-  const { entries, currentId } = collectSessionEntries(
+  const { entries, archivedEntries, currentId } = collectSessionEntries(
     sessionList,
     workspaceList,
     statuses,
@@ -280,5 +331,10 @@ export function projectSessionData({
     accessTimes,
     pendingOrder,
   );
-  return { entries, currentId, workspaceRows: collectWorkspaceRows(workspaceList, entries) };
+  return {
+    entries,
+    archivedEntries,
+    currentId,
+    workspaceRows: collectWorkspaceRows(workspaceList, entries),
+  };
 }

@@ -95,9 +95,11 @@ export const STYLE = `
       .dqs-row-selected {
         background: var(--dsw-alias-bg-layer-2);
       }
-      /* Row metadata: one capsule per item, whether it is a whole shortcut,
-         the recent mark, or the digit jump. The footer's dqs-keycap stays a
-         bordered key because it prompts an action rather than describing one. */
+      /* Row capsules: one capsule per item, whether it is a whole shortcut,
+         the recent mark, or the digit jump. A row's leading glyph borrows the
+         same capsule so an action badge and a metadata badge keep one shape.
+         The footer's dqs-keycap stays a bordered key because it is a key the
+         user presses, not a label on a row. */
       .dqs-chip {
         display: inline-flex;
         flex: 0 0 auto;
@@ -183,18 +185,15 @@ export const STYLE = `
         align-items: center;
         gap: 8px;
       }
+      /* The leading glyph keeps a pinned 20px slot so every row that carries one
+         starts its title at the same x; the capsule look itself comes from
+         dqs-chip, including the selected-row wash. */
       .dqs-create-icon {
-        display: inline-flex;
-        flex: 0 0 auto;
-        align-items: center;
+        box-sizing: border-box;
         justify-content: center;
         width: 20px;
         height: 20px;
-        border: 0.5px solid var(--dsw-alias-border-l1);
-        border-radius: 6px;
-        color: var(--dsw-alias-label-secondary);
-        font-size: 13px;
-        line-height: 1;
+        padding: 0;
       }
       .dqs-create-label {
         color: var(--dsw-alias-label-primary);

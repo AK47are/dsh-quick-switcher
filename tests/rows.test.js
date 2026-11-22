@@ -1,7 +1,8 @@
-/* Row shape: a command's shortcut, its recent mark and the digit jump share
- * the capsule language, and the bordered keycap is left to the footer. The
- * test bundles the real row component with the same React and primitives
- * stubs the contract test uses, then inspects the element tree it returns. */
+/* Row shape: a command's shortcut, its recent mark, the digit jump and a row's
+ * leading glyph share the capsule language, and the bordered keycap is left to
+ * the footer. The test bundles the real row component with the same React and
+ * primitives stubs the contract test uses, then inspects the element tree it
+ * returns. */
 
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -109,6 +110,15 @@ test("the recent mark and the jump hint are capsules too", () => {
   assert.deepEqual(textsOf(badge), ["最近"]);
   assert.equal(jump.props.className, "dqs-chip dqs-jump");
   assert.deepEqual(textsOf(jump), ["Alt", "+", "7"]);
+});
+
+test("a row's leading glyph wears the same capsule as its metadata", () => {
+  const tree = render({ key: "c:w1", title: "新建会话", meta: [], icon: "+" });
+  const leading = findByClass(tree, "dqs-create-icon");
+  assert.equal(leading.props.className, "dqs-chip dqs-create-icon");
+  assert.deepEqual(textsOf(leading), ["+"]);
+  assert.equal(leading.props["aria-hidden"], "true");
+  assert.equal(findByClass(tree, "dqs-keycap"), null);
 });
 
 test("the jump capsule follows the macOS label", () => {

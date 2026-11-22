@@ -123,9 +123,9 @@ function highlightTitle(text, positions) {
  *
  * A matcher decides what to show by filling the uniform row shape; the panel
  * only owns selection, icons, status, badges, click dispatch, and the digit-jump
- * hint on the first nine rows. The shortcut, the recent mark and the jump hint
- * are capsules; the footer keeps bordered keycaps for the keys it asks the user
- * to press.
+ * hint on the first nine rows. The shortcut, the recent mark, the jump hint and
+ * the leading glyph are all capsules; the footer keeps bordered keycaps for the
+ * keys it asks the user to press.
  *
  * Hover is reported as `pointermove` rather than `mouseenter`: the browser
  * replays enter events for elements that appear under a stationary pointer,
@@ -155,7 +155,7 @@ export function RowView({ row, selected, index, onPointerMove, onActivate, regis
       "div",
       { className: row.icon ? "dqs-row-main dqs-create-main" : "dqs-row-main" },
       row.icon
-        ? h("span", { className: "dqs-create-icon", "aria-hidden": "true" }, row.icon)
+        ? h("span", { className: "dqs-chip dqs-create-icon", "aria-hidden": "true" }, row.icon)
         : null,
       h("div", { className: titleClassName }, highlightTitle(row.title, row.positions)),
       meta.length === 0

@@ -64,7 +64,6 @@ export default defineModule("workspaces", (api) => {
         return {
           workspaceRows: data?.workspaceRows ?? [],
           rowFor: data?.rowFor ?? null,
-          currentId: data?.currentId ?? null,
         };
       }
 
@@ -74,12 +73,16 @@ export default defineModule("workspaces", (api) => {
         return token;
       }
 
-      /** First row the caret should land on after Enter opens a workspace. */
-      function scopeStartKey(workspace, currentId) {
-        const current = workspace.sessions.find((entry) => entry.id === currentId);
-        if (current) return `s:${current.id}`;
-        const first = workspace.sessions[0];
-        return first ? `s:${first.id}` : `c:${workspace.workspaceId}`;
+      /**
+       * The caret starts on the create row.
+       *
+       * The scope list has no previous-session anchor. The current session is
+       * usually the one the user just came from: selecting it made Enter a
+       * no-op, while selecting the first session was arbitrary. The create row
+       * is the only fixed row here, so it is the predictable start.
+       */
+      function scopeStartKey(workspace) {
+        return `c:${workspace.workspaceId}`;
       }
 
       function listView(parsed, panel) {
@@ -93,7 +96,7 @@ export default defineModule("workspaces", (api) => {
           className: "dqs-workspace-row",
           run() {
             panel.setQuery(remember(entry), {
-              selectedKey: scopeStartKey(entry, snapshot().currentId),
+              selectedKey: scopeStartKey(entry),
             });
           },
           // Shift+Enter used to start a session here. Starting a workspace next

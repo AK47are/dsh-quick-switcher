@@ -124,7 +124,7 @@ test("the workspace list filters, remembers the id and enters the workspace-path
   view.rows[0].run();
   assert.deepEqual(harness.panel.query, {
     query: "+Work ",
-    options: { selectedKey: "s:s1" },
+    options: { selectedKey: "c:w1" },
   });
 
   // Shift now seeds the parent directory of the highlighted workspace; the
@@ -187,7 +187,7 @@ test("a pinned workspace keeps its id even when two titles are equal", () => {
   const view = harness.matcher.view(list, harness.panel);
   view.rows[1].run();
   assert.equal(harness.panel.query.query, "+Same ");
-  assert.deepEqual(harness.panel.query.options, { selectedKey: "s:s1" });
+  assert.deepEqual(harness.panel.query.options, { selectedKey: "c:w2" });
 
   const pinned = harness.matcher.match("+Same ");
   assert.equal(pinned.mode, "scope");

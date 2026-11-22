@@ -1,5 +1,5 @@
 /**
- * Host half of the new-workspace mode.
+ * Host half of the workspace-path mode.
  *
  * DSH's own directory browser only exists when the host composes the browse
  * directory picker. The loopback desktop host composes the native picker
@@ -190,7 +190,7 @@ async function mkdirRoute(request, response) {
   return sendJson(response, 200, { ok: true, path: canonical });
 }
 
-export default defineHostModule("new-workspace", () => ({
+export default defineHostModule("workspace-path", () => ({
   routes: [
     { path: LIST_PATH, handler: listRoute },
     { path: MKDIR_PATH, handler: mkdirRoute },

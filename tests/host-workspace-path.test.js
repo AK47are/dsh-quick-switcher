@@ -4,13 +4,13 @@ import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import hostModule from "../src/modules/new-workspace/host.js";
-import { LIST_PATH, MKDIR_PATH } from "../src/modules/new-workspace/shared.js";
+import hostModule from "../src/modules/workspace-path/host.js";
+import { LIST_PATH, MKDIR_PATH } from "../src/modules/workspace-path/shared.js";
 
 function createRoutes() {
   const routes = new Map();
   const api = {
-    id: "new-workspace",
+    id: "workspace-path",
     webServer: {
       register({ path, handler }) {
         routes.set(path, handler);
@@ -72,7 +72,7 @@ async function send(handler, { method = "GET", path = "/", headers, body } = {})
 }
 
 async function withRoot(fn) {
-  const root = await mkdtemp(join(tmpdir(), "dqs-new-workspace-"));
+  const root = await mkdtemp(join(tmpdir(), "dqs-workspace-path-"));
   try {
     return await fn(root);
   } finally {

@@ -117,7 +117,7 @@ export default defineModule("workspaces", (api) => {
           note: null,
           hints: [
             { keys: ["Enter"], label: api.t("hintViewSessions") },
-            { keys: ["Shift+Enter"], label: api.t("hintNewWorkspace") },
+            { keys: ["Shift+Enter"], label: api.t("hintWorkspacePath") },
             { keys: ["Esc"], label: api.t("hintClose") },
           ],
           count: api.t("countWorkspaces", { count: rows.length }),

@@ -1,11 +1,11 @@
-/* New-workspace module: the "=" path mode. */
+/* Workspace-path module: the "=" path mode. */
 
 import { defineModule, prefixMatcher } from "../../core/module.js";
 import { locale } from "./locale.js";
-import { createNewWorkspaceRuntime } from "./logic.js";
+import { createWorkspacePathRuntime } from "./logic.js";
 import { guessStyle } from "./path.js";
 
-export default defineModule("new-workspace", (api) => {
+export default defineModule("workspace-path", (api) => {
   /** Same-origin fetch is the only transport the host route needs. */
   function request(path, init) {
     return fetch(path, init);
@@ -28,13 +28,13 @@ export default defineModule("new-workspace", (api) => {
   return {
     apiVersion: 1,
     order: 25,
-    labelKey: "newWorkspaceTitle",
-    descriptionKey: "newWorkspaceDescription",
+    labelKey: "workspacePathTitle",
+    descriptionKey: "workspacePathDescription",
     entry: { seed: "=" },
     locale,
     mount(panel) {
       const startDir = currentWorkspacePath(panel);
-      const runtime = createNewWorkspaceRuntime({
+      const runtime = createWorkspacePathRuntime({
         api,
         panel,
         request,
@@ -44,7 +44,7 @@ export default defineModule("new-workspace", (api) => {
       return {
         matchers: [
           prefixMatcher("=", {
-            id: "new-workspace",
+            id: "workspace-path",
             priority: 10,
             map: (text) => ({ text }),
             view: (state) => runtime.view(state.text),

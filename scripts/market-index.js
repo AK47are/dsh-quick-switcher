@@ -20,8 +20,8 @@ const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const plugin = {
   title: { en: "Quick switcher", zh: "快速切换器" },
   description: {
-    en: "One search surface for sessions, workspaces, creating a workspace from a directory path, commands, input history, main panels, workspace files, archived sessions, and a side question that never enters the main conversation.",
-    zh: "统一搜索入口：切换会话、浏览工作区、按路径新建工作区、运行命令、回填输入历史、跳到主面板、搜索文件、找回已归档会话，还能就当前会话侧问。",
+    en: "One search surface for sessions, workspaces, opening or creating a workspace from a directory path, commands, input history, main panels, workspace files, archived sessions, and a side question that never enters the main conversation.",
+    zh: "统一搜索入口：切换会话、浏览工作区、按路径打开或创建工作区、运行命令、回填输入历史、跳到主面板、搜索文件、找回已归档会话，还能就当前会话侧问。",
   },
   icon: "../icon.svg",
   author: "AK47are",

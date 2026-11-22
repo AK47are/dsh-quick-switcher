@@ -1,4 +1,4 @@
-/* Protocol shared by the new-workspace client and its host half. */
+/* Protocol shared by the workspace-path client and its host half. */
 
 export const LIST_PATH = "/dsh-quick-switcher/paths";
 export const MKDIR_PATH = "/dsh-quick-switcher/paths/mkdir";

@@ -110,7 +110,7 @@ test("only the plus prefix claims the query", () => {
   assert.deepEqual(state, { mode: "list", filter: "" });
 });
 
-test("the workspace list filters, remembers the id and enters the new-workspace mode on shift", () => {
+test("the workspace list filters, remembers the id and enters the workspace-path mode on shift", () => {
   const harness = createHarness();
   harness.publish();
   const state = harness.matcher.match("+");

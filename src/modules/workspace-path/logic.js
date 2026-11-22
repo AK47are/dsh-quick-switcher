@@ -1,5 +1,5 @@
 /**
- * New-workspace mode: path parsing, directory loading, and row building.
+ * Workspace-path mode: path parsing, directory loading, and row building.
  *
  * The client cannot ask DSH for an arbitrary directory listing on this host
  * (the native picker is composed, so `uiWorkspace.listDirectory` is refused),
@@ -33,7 +33,7 @@ const PREFIX_SCORE = 2_000_000;
  * @param {string|null} options.startDir current workspace path when one is open
  * @param {"win32"|"posix"} options.style path grammar guessed before the first response
  */
-export function createNewWorkspaceRuntime({
+export function createWorkspacePathRuntime({
   api,
   panel,
   request,
@@ -206,7 +206,7 @@ export function createNewWorkspaceRuntime({
               ? body.path
               : "";
         if (body?.ok !== true || home === "") {
-          panel.setError(api.t("newWorkspaceStartFailed"));
+          panel.setError(api.t("workspacePathStartFailed"));
           return;
         }
         if (typeof body.platform === "string") {
@@ -219,7 +219,7 @@ export function createNewWorkspaceRuntime({
       .catch(() => {
         runtime.seeding = false;
         if (disposed) return;
-        panel.setError(api.t("newWorkspaceStartFailed"));
+        panel.setError(api.t("workspacePathStartFailed"));
       });
   }
 
@@ -242,8 +242,7 @@ export function createNewWorkspaceRuntime({
       title: `${match.name}/`,
       positions: match.positions,
       meta: [{ text: match.path, className: "dqs-workspace-path" }],
-      badge: findWorkspace(match.path) === null ? null : api.t("newWorkspaceBadge"),
-      className: "dqs-new-workspace-row",
+      badge: findWorkspace(match.path) === null ? null : api.t("workspacePathBadge"),
       run: commit(match.path),
     };
   }
@@ -256,7 +255,7 @@ export function createNewWorkspaceRuntime({
         key: `t:${directory}`,
         target: true,
         path: directory,
-        title: api.t("newWorkspaceExisting", { title: String(workspace.title ?? "") }),
+        title: api.t("workspacePathExisting", { title: String(workspace.title ?? "") }),
         meta: [{ text: directory, className: "dqs-workspace-path" }],
         className: "dqs-create-row",
         titleClassName: "dqs-create-label",
@@ -267,7 +266,7 @@ export function createNewWorkspaceRuntime({
       key: `t:${directory}`,
       target: true,
       path: directory,
-      title: api.t("newWorkspaceHere"),
+      title: api.t("workspacePathHere"),
       meta: [{ text: directory, className: "dqs-workspace-path" }],
       className: "dqs-create-row",
       titleClassName: "dqs-create-label",
@@ -282,7 +281,7 @@ export function createNewWorkspaceRuntime({
       key: `m:${directory}`,
       target: true,
       path: directory,
-      title: api.t("newWorkspaceCreateDirectory"),
+      title: api.t("workspacePathCreateDirectory"),
       meta: [{ text: directory, className: "dqs-workspace-path" }],
       className: "dqs-create-row",
       titleClassName: "dqs-create-label",
@@ -293,11 +292,11 @@ export function createNewWorkspaceRuntime({
 
   function listingErrorText(listing) {
     const reason =
-      listing.message !== "" ? listing.message : api.t("newWorkspaceUnknownReason");
-    if (listing.code === "missing") return api.t("newWorkspaceMissing");
-    if (listing.code === "not-directory") return api.t("newWorkspaceNotDirectory");
-    if (listing.code === "denied") return api.t("newWorkspaceDenied", { reason });
-    return api.t("newWorkspaceUnreadable", { reason });
+      listing.message !== "" ? listing.message : api.t("workspacePathUnknownReason");
+    if (listing.code === "missing") return api.t("workspacePathMissing");
+    if (listing.code === "not-directory") return api.t("workspacePathNotDirectory");
+    if (listing.code === "denied") return api.t("workspacePathDenied", { reason });
+    return api.t("workspacePathUnreadable", { reason });
   }
 
   /**
@@ -353,8 +352,8 @@ export function createNewWorkspaceRuntime({
   }
 
   function trimmedNote(directories, listing) {
-    if (directories.trimmed) return api.t("newWorkspaceTrimmed", { count: RESULT_LIMIT });
-    if (listing.truncated) return api.t("newWorkspaceTruncated", { count: MAX_ENTRIES });
+    if (directories.trimmed) return api.t("workspacePathTrimmed", { count: RESULT_LIMIT });
+    if (listing.truncated) return api.t("workspacePathTruncated", { count: MAX_ENTRIES });
     return null;
   }
 
@@ -370,8 +369,8 @@ export function createNewWorkspaceRuntime({
   }
 
   const hints = [
-    { keys: ["Enter"], label: api.t("newWorkspaceHintSelect") },
-    { keys: ["Tab"], label: api.t("newWorkspaceHintEnter") },
+    { keys: ["Enter"], label: api.t("workspacePathHintSelect") },
+    { keys: ["Tab"], label: api.t("workspacePathHintEnter") },
     { keys: ["Esc"], label: api.t("hintClose") },
   ];
 
@@ -379,9 +378,9 @@ export function createNewWorkspaceRuntime({
     if (text !== "") runtime.seeded = false;
     const parsed = parseCreateQuery(text, runtime);
     const result = {
-      placeholder: api.t("newWorkspacePlaceholder"),
-      searchAria: api.t("newWorkspaceSearchAria"),
-      listLabel: api.t("newWorkspaceListLabel"),
+      placeholder: api.t("workspacePathPlaceholder"),
+      searchAria: api.t("workspacePathSearchAria"),
+      listLabel: api.t("workspacePathListLabel"),
       rows: [],
       emptyText: null,
       note: null,
@@ -394,25 +393,25 @@ export function createNewWorkspaceRuntime({
     if (parsed.kind === "none") {
       result.emptyText =
         parsed.reason === "missing-start"
-          ? api.t("newWorkspaceLoading")
-          : api.t("newWorkspaceNeedAbsolute");
+          ? api.t("workspacePathLoading")
+          : api.t("workspacePathNeedAbsolute");
       return result;
     }
 
     const listing = cache.get(cacheKey(parsed.directory));
     if (listing === undefined) {
-      result.emptyText = api.t("newWorkspaceLoading");
+      result.emptyText = api.t("workspacePathLoading");
       return result;
     }
 
     if (listing.status === "error") {
       if (parsed.kind === "intent" && listing.code === "missing") {
         if (isRootPath(parsed.directory)) {
-          result.emptyText = api.t("newWorkspaceRootMissing");
+          result.emptyText = api.t("workspacePathRootMissing");
           return result;
         }
         result.rows = [mkdirRow(parsed.directory)];
-        result.note = api.t("newWorkspaceWillCreate");
+        result.note = api.t("workspacePathWillCreate");
         return result;
       }
       result.emptyText = listingErrorText(listing);
@@ -426,18 +425,18 @@ export function createNewWorkspaceRuntime({
       // same path DSH will store instead of a symlinked or mixed-case variant.
       const targetDirectory = listing.path !== "" ? listing.path : parsed.directory;
       result.rows = [targetRow(targetDirectory), ...children];
-      result.count = api.t("newWorkspaceCount", { count: children.length });
+      result.count = api.t("workspacePathCount", { count: children.length });
       result.note = trimmedNote(directories, listing);
       return result;
     }
 
     result.rows = directories.rows.map(directoryRow);
     if (result.rows.length === 0) {
-      result.emptyText = api.t("newWorkspaceNoMatch");
-      result.note = api.t("newWorkspaceSeparatorHint");
+      result.emptyText = api.t("workspacePathNoMatch");
+      result.note = api.t("workspacePathSeparatorHint");
       return result;
     }
-    result.count = api.t("newWorkspaceCount", { count: result.rows.length });
+    result.count = api.t("workspacePathCount", { count: result.rows.length });
     result.note = trimmedNote(directories, listing);
     return result;
   }
@@ -459,21 +458,21 @@ export function createNewWorkspaceRuntime({
             body: JSON.stringify({ path }),
           });
           if (created?.ok !== true) {
-            panel.setError(api.t("newWorkspaceMkdirFailed", { reason: reasonOf(created) }));
+            panel.setError(api.t("workspacePathMkdirFailed", { reason: reasonOf(created) }));
             return;
           }
           cache.delete(cacheKey(path));
         }
         const service = api.get("workspaces");
         if (service === null || service === undefined || typeof service.create !== "function") {
-          panel.setError(api.t("newWorkspaceServiceUnavailable"));
+          panel.setError(api.t("workspacePathServiceUnavailable"));
           return;
         }
         const workspace = await service.create({ path });
         const workspaceId =
           typeof workspace?.workspaceId === "string" ? workspace.workspaceId : "";
         if (workspaceId === "") {
-          panel.setError(api.t("newWorkspaceCreateFailed", { reason: api.t("newWorkspaceUnknownReason") }));
+          panel.setError(api.t("workspacePathCreateFailed", { reason: api.t("workspacePathUnknownReason") }));
           return;
         }
         const uiWorkspace = api.services?.uiWorkspace;
@@ -483,7 +482,7 @@ export function createNewWorkspaceRuntime({
           } catch {
             // The workspace exists now; keeping the panel open lets the user
             // press Enter again or find it in the "+" list.
-            panel.setError(api.t("newWorkspaceSessionFailed"));
+            panel.setError(api.t("workspacePathSessionFailed"));
             return;
           }
         }
@@ -491,10 +490,10 @@ export function createNewWorkspaceRuntime({
       } catch (error) {
         const code = error?.rpcError?.code ?? error?.code;
         if (code === "workspace/invalid-path") {
-          panel.setError(api.t("newWorkspaceInvalidPath"));
+          panel.setError(api.t("workspacePathInvalidPath"));
           return;
         }
-        panel.setError(api.t("newWorkspaceCreateFailed", { reason: messageOf(error) }));
+        panel.setError(api.t("workspacePathCreateFailed", { reason: messageOf(error) }));
       }
     };
   }

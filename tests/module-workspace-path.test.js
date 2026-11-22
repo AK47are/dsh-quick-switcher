@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createNewWorkspaceRuntime } from "../src/modules/new-workspace/logic.js";
-import { parseCreateQuery } from "../src/modules/new-workspace/path.js";
-import { LIST_PATH, MKDIR_PATH } from "../src/modules/new-workspace/shared.js";
+import { createWorkspacePathRuntime } from "../src/modules/workspace-path/logic.js";
+import { parseCreateQuery } from "../src/modules/workspace-path/path.js";
+import { LIST_PATH, MKDIR_PATH } from "../src/modules/workspace-path/shared.js";
 
 const WIN = "win32";
 const POSIX = "posix";
@@ -61,7 +61,7 @@ function createHarness({ startDir = null, items = [], transport, createError } =
   const services = { uiWorkspace: { startSession: (id) => started.push(id) } };
   const workspaces = workspaceServiceOf({ items, created, createError });
   const api = {
-    id: "new-workspace",
+    id: "workspace-path",
     t: translate,
     get(name) {
       return name === "workspaces" ? workspaces : undefined;
@@ -91,7 +91,7 @@ function createHarness({ startDir = null, items = [], transport, createError } =
       this.closed = options ?? true;
     },
   };
-  const runtime = createNewWorkspaceRuntime({
+  const runtime = createWorkspacePathRuntime({
     api,
     panel,
     request: transport.request,
@@ -182,17 +182,17 @@ test("a seeded directory lists its subdirectories and keeps a commit target", as
   const harness = createHarness({ startDir: "C:\\Users\\ASUS1", transport });
 
   const loading = harness.runtime.view("C:\\Users\\ASUS1\\projects\\");
-  assert.equal(loading.emptyText, "newWorkspaceLoading");
+  assert.equal(loading.emptyText, "workspacePathLoading");
   loading.load();
   await wait();
 
   const ready = harness.runtime.view("C:\\Users\\ASUS1\\projects\\");
   assert.equal(ready.rows.length, 2);
   assert.equal(ready.rows[0].target, true);
-  assert.equal(ready.rows[0].title, "newWorkspaceHere");
+  assert.equal(ready.rows[0].title, "workspacePathHere");
   assert.equal(ready.rows[1].title, "alpha/");
   assert.equal(ready.rows[1].meta[0].text, "C:\\Users\\ASUS1\\projects\\alpha");
-  assert.equal(ready.count, "newWorkspaceCount:1");
+  assert.equal(ready.count, "workspacePathCount:1");
   assert.equal(ready.note, null);
 
   // Tab on the target is consumed without moving the query; on a child it
@@ -242,7 +242,7 @@ test("an existing workspace is labelled and opened instead of recreated", async 
   await wait();
 
   const view = harness.runtime.view("C:\\Users\\ASUS1\\projects\\");
-  assert.equal(view.rows[0].title, "newWorkspaceExisting:Projects");
+  assert.equal(view.rows[0].title, "workspacePathExisting:Projects");
 
   await view.rows[0].run();
   assert.deepEqual(harness.created, ["C:\\Users\\ASUS1\\projects"]);
@@ -283,8 +283,8 @@ test("the typed segment filters a cached listing without refetching", async () =
     [".git/"],
   );
   const empty = harness.runtime.view("C:\\Users\\ASUS1\\projects\\zzz");
-  assert.equal(empty.emptyText, "newWorkspaceNoMatch");
-  assert.equal(empty.note, "newWorkspaceSeparatorHint");
+  assert.equal(empty.emptyText, "workspacePathNoMatch");
+  assert.equal(empty.note, "workspacePathSeparatorHint");
   // Typing inside the segment never changes the directory, so the cache holds.
   assert.equal(transport.calls.length, 1);
 });
@@ -296,14 +296,14 @@ test("a missing directory offers the mkdir row and creates the tree first", asyn
   const harness = createHarness({ startDir: "C:\\Users\\ASUS1", transport });
 
   const loading = harness.runtime.view("C:\\Users\\ASUS1\\new\\deep\\");
-  assert.equal(loading.emptyText, "newWorkspaceLoading");
+  assert.equal(loading.emptyText, "workspacePathLoading");
   loading.load();
   await wait();
 
   const view = harness.runtime.view("C:\\Users\\ASUS1\\new\\deep\\");
   assert.equal(view.rows.length, 1);
-  assert.equal(view.rows[0].title, "newWorkspaceCreateDirectory");
-  assert.equal(view.note, "newWorkspaceWillCreate");
+  assert.equal(view.rows[0].title, "workspacePathCreateDirectory");
+  assert.equal(view.note, "workspacePathWillCreate");
 
   await view.rows[0].run();
   const mkdir = transport.calls.find((call) => call.input === MKDIR_PATH);
@@ -321,7 +321,7 @@ test("a missing drive root is reported instead of being created", async () => {
 
   const view = harness.runtime.view("Z:\\");
   assert.deepEqual(view.rows, []);
-  assert.equal(view.emptyText, "newWorkspaceRootMissing");
+  assert.equal(view.emptyText, "workspacePathRootMissing");
   assert.equal(
     transport.calls.some((call) => call.input === MKDIR_PATH),
     false,
@@ -336,7 +336,7 @@ test("a listing that is not a directory explains itself", async () => {
 
   const view = harness.runtime.view("C:\\Users\\ASUS1\\readme.txt\\");
   assert.deepEqual(view.rows, []);
-  assert.equal(view.emptyText, "newWorkspaceNotDirectory");
+  assert.equal(view.emptyText, "workspacePathNotDirectory");
 });
 
 test("a bare equals sign seeds the current workspace, or home without one", async () => {
@@ -377,7 +377,7 @@ test("a cancelled or failing registration keeps the panel open", async () => {
   denied.runtime.view("C:\\Users\\ASUS1\\blocked\\").load();
   await wait();
   await denied.runtime.view("C:\\Users\\ASUS1\\blocked\\").rows[0].run();
-  assert.equal(denied.panel.error, "newWorkspaceMkdirFailed:permission denied");
+  assert.equal(denied.panel.error, "workspacePathMkdirFailed:permission denied");
   assert.equal(denied.panel.closed, undefined);
 
   const invalid = createHarness({
@@ -390,7 +390,7 @@ test("a cancelled or failing registration keeps the panel open", async () => {
   invalid.runtime.view("C:\\Users\\ASUS1\\").load();
   await wait();
   await invalid.runtime.view("C:\\Users\\ASUS1\\").rows[0].run();
-  assert.equal(invalid.panel.error, "newWorkspaceInvalidPath");
+  assert.equal(invalid.panel.error, "workspacePathInvalidPath");
   assert.equal(invalid.panel.closed, undefined);
 });
 
@@ -406,7 +406,7 @@ test("a session start failure keeps the created workspace and the panel", async 
   await wait();
   await harness.runtime.view("C:\\Users\\ASUS1\\").rows[0].run();
   assert.deepEqual(harness.created, ["C:\\Users\\ASUS1"]);
-  assert.equal(harness.panel.error, "newWorkspaceSessionFailed");
+  assert.equal(harness.panel.error, "workspacePathSessionFailed");
   assert.equal(harness.panel.closed, undefined);
 });
 

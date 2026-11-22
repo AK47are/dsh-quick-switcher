@@ -12,7 +12,7 @@ export const locale = {
     "listLabelScope": "该工作区的会话",
     "searchAria": "搜索会话",
     "hintViewSessions": "查看会话",
-    "hintNewWorkspace": "新建工作区",
+    "hintWorkspacePath": "工作区路径",
     "hintOpen": "打开",
     "count": "{count} 个会话",
     "countWorkspaces": "{count} 个工作区",
@@ -20,7 +20,7 @@ export const locale = {
     "createFailed": "无法新建会话",
     "workspacePathFailed": "无法读取工作区路径",
     "workspacesTitle": "工作区",
-    "workspacesDescription": "按工作区浏览会话或新建会话；Shift+Enter 进入新建工作区。数据来自会话模块。",
+    "workspacesDescription": "按工作区浏览会话或新建会话；Shift+Enter 进入工作区路径。数据来自会话模块。",
   },
   en: {
     "placeholderWorkspaces": "Search by workspace title or path",
@@ -33,7 +33,7 @@ export const locale = {
     "listLabelScope": "Workspace sessions",
     "searchAria": "Search sessions",
     "hintViewSessions": "view",
-    "hintNewWorkspace": "new workspace",
+    "hintWorkspacePath": "workspace path",
     "hintOpen": "open",
     "count": "{count} sessions",
     "countWorkspaces": "{count} workspaces",
@@ -41,7 +41,7 @@ export const locale = {
     "createFailed": "Could not create a session",
     "workspacePathFailed": "Could not read the workspace path",
     "workspacesTitle": "Workspaces",
-    "workspacesDescription": "Browse sessions by workspace or start a new one; Shift+Enter opens the new-workspace mode. The data comes from the sessions module.",
+    "workspacesDescription": "Browse sessions by workspace or start a new one; Shift+Enter opens the workspace-path mode. The data comes from the sessions module.",
   },
 };
 

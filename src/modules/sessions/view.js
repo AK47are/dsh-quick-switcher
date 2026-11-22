@@ -30,7 +30,7 @@ export function createSessionsView({ api, shared, rowFor }) {
         { keys: ["Enter"], label: api.t("hintOpen") },
         { keys: ["Esc"], label: api.t("hintClose") },
         { keys: ["+"], label: api.t("hintWorkspaceMode") },
-        { keys: ["="], label: api.t("hintNewWorkspaceMode") },
+        { keys: ["="], label: api.t("hintWorkspacePathMode") },
         { keys: [">"], label: api.t("hintCommandMode") },
         { keys: ["@"], label: api.t("hintFileMode") },
         { keys: ["!"], label: api.t("hintHistoryMode") },

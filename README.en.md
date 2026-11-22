@@ -1,6 +1,6 @@
 English | [中文](https://github.com/AK47are/dsh-quick-switcher/blob/main/README.md)
 
-Quick switcher turns one input box into the search surface for the whole DSH session: jump between sessions and workspaces, create a workspace from a directory path, run any application command, refill the prompt box from your history, open a main panel, preview workspace files, recover archived sessions, and ask a side question that never enters the main conversation. It is keyboard first, and every mode can be switched off in Settings.
+Quick switcher turns one input box into the search surface for the whole DSH session: jump between sessions and workspaces, open or create a workspace from a directory path, run any application command, refill the prompt box from your history, open a main panel, preview workspace files, recover archived sessions, and ask a side question that never enters the main conversation. It is keyboard first, and every mode can be switched off in Settings.
 
 ![The command mode over a session page](https://raw.githubusercontent.com/AK47are/dsh-quick-switcher/main/.agents/docs/assets/overview.png)
 
@@ -12,7 +12,7 @@ Each mode is a list behind the same input box, and a trigger character at the st
 |---|---|---|
 | none | Sessions | unarchived top-level sessions by title, workspace, path or session ID |
 | `+` | Workspaces | workspaces by title or path, with the visible session count |
-| `=` | New workspace | subdirectories of a directory; Enter registers the highlighted directory and opens a new session |
+| `=` | Workspace path | subdirectories of a directory; Enter opens an existing workspace, or registers the directory and opens a new session |
 | `>` | Commands | every editable DSH application command, most recent first |
 | `!` | History | prompts you sent and answers you gave to question cards |
 | `#` | Main panels | Plugins, Automation tasks and any other full-page panel |
@@ -51,7 +51,7 @@ The repository also publishes its own market index:
 Press Ctrl+Shift+K to open the panel, type to filter, move with the arrow keys, Enter opens the selection and Esc closes. The shortcut can be changed in Edit shortcuts under "Open quick switcher".
 
 - The first row is always the previous session, so Enter right after opening jumps back
-- Shift+Enter on a workspace row enters the new-workspace mode with its parent directory; a missing directory is created first
+- Shift+Enter on a workspace row enters the workspace-path mode with its parent directory; a missing directory is created first
 - Type `~` to list archived sessions; Enter unarchives and opens, Shift+Enter only unarchives
 - The capsule on the right of the first nine rows shows the platform's jump hint: Alt + 1 to Alt + 9 on Windows, and ⌥ 1 to ⌥ 9 on macOS; press the matching combination to run that row
 - The first visible row always carries Alt + 1 (⌥ 1 on macOS), and rows past the ninth have no jump hint
@@ -83,7 +83,7 @@ Apart from the model request a side question makes, the plugin sends nothing.
 - Side-question records live in browser local storage; Settings can cap or clear them. A side question never enters the DSH session log, and only an explicit fork writes the question and answer into a new session
 - Asking or regenerating a side question sends the conversation the model can see, its tool calls and the running step to the selected provider; images and files ride along by default and can be turned off in Settings
 - The side-question host endpoints are internal to the local DSH host and are not a public API
-- New-workspace directory reads and directory creation go through local host endpoints; they touch only this machine and send nothing
+- Workspace-path directory reads and directory creation go through local host endpoints; they touch only this machine and send nothing
 - The plugin has no telemetry or analytics
 
 ## Limits

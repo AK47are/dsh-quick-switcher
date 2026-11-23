@@ -135,6 +135,85 @@ test("the workspace list filters, remembers the id and enters the workspace-path
   assert.equal(harness.panel.closed, undefined);
 });
 
+test("Tab completes the highlighted title without opening the scope", () => {
+  const harness = createHarness();
+  harness.publish();
+  const view = harness.matcher.view(harness.matcher.match("+"), harness.panel);
+  assert.deepEqual(view.hints[1], { keys: ["Tab"], label: "hintCompleteTitle" });
+
+  assert.equal(view.keydown({ key: "Tab" }, harness.panel, view.rows[0]), true);
+  assert.deepEqual(harness.panel.query, {
+    query: "+Work",
+    options: { selectedKey: "w:w1" },
+  });
+  // No trailing space means the token is not a scope yet.
+  assert.deepEqual(harness.matcher.match("+Work"), { mode: "list", filter: "Work" });
+
+  assert.equal(view.keydown({ key: "Tab" }, harness.panel, view.rows[1]), true);
+  assert.deepEqual(harness.panel.query, {
+    query: "+Other",
+    options: { selectedKey: "w:w2" },
+  });
+
+  harness.panel.query = undefined;
+  assert.equal(view.keydown({ key: "Tab", shiftKey: true }, harness.panel, view.rows[0]), false);
+  assert.equal(harness.panel.query, undefined);
+});
+
+test("a completed title stays in the list when a shorter title forms a scope", () => {
+  const harness = createHarness();
+  const workspaceRows = [
+    {
+      workspaceId: "w1",
+      title: "Work",
+      path: "/a",
+      titleLower: "work",
+      metaLower: "work /a",
+      sessions: [],
+      count: 0,
+      updatedAt: 1,
+    },
+    {
+      workspaceId: "w2",
+      title: "Work Shop",
+      path: "/b",
+      titleLower: "work shop",
+      metaLower: "work shop /b",
+      sessions: [],
+      count: 0,
+      updatedAt: 2,
+    },
+  ];
+  harness.shared.publish({ entries: [], workspaceRows, rowFor: null, currentId: null });
+  const view = harness.matcher.view(harness.matcher.match("+"), harness.panel);
+  const target = view.rows.find((row) => row.key === "w:w2");
+  assert.equal(view.keydown({ key: "Tab" }, harness.panel, target), true);
+  assert.deepEqual(harness.panel.query, {
+    query: "+Work Shop",
+    options: { selectedKey: "w:w2" },
+  });
+  assert.deepEqual(harness.matcher.match("+Work Shop"), {
+    mode: "list",
+    filter: "Work Shop",
+  });
+
+  target.run();
+  assert.deepEqual(harness.panel.query, {
+    query: "+Work Shop ",
+    options: { selectedKey: "c:w2" },
+  });
+  const entered = harness.matcher.match("+Work Shop ");
+  assert.equal(entered.mode, "scope");
+  assert.equal(entered.workspace.workspaceId, "w2");
+
+  // The completion guard lasts for one query; typing the same text by hand
+  // still follows the scope grammar.
+  const manual = harness.matcher.match("+Work Shop");
+  assert.equal(manual.mode, "scope");
+  assert.equal(manual.workspace.workspaceId, "w1");
+  assert.equal(manual.filter, "Shop");
+});
+
 test("entering a workspace lists its sessions and a create row", () => {
   const harness = createHarness();
   harness.publish();

@@ -51,6 +51,7 @@ The repository also publishes its own market index:
 Press Ctrl+Shift+K to open the panel, type to filter, move with the arrow keys, Enter opens the selection and Esc closes. The shortcut can be changed in Edit shortcuts under "Open quick switcher".
 
 - The first row is always the previous session, so Enter right after opening jumps back
+- Tab on a workspace row fills its full title into the input without opening the scope; press Enter or type the space to open it
 - Shift+Enter on a workspace row enters the workspace-path mode with its parent directory; a missing directory is created first
 - Type `~` to list archived sessions; Enter unarchives and opens, Shift+Enter only unarchives
 - The capsule on the right of the first nine rows shows the platform's jump hint: Alt + 1 to Alt + 9 on Windows, and ⌥ 1 to ⌥ 9 on macOS; press the matching combination to run that row

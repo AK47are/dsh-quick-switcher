@@ -57,6 +57,10 @@ export default defineModule("workspaces", (api) => {
       // Enter remembers the exact workspace id, so two workspaces that share a
       // title stay unambiguous while the user keeps editing the filter.
       let pinned = null;
+      // Tab completion is a one-shot list state: the filled title must stay in
+      // the workspace list even when the same text also parses as a shorter
+      // title plus a filter. Any later query clears it.
+      let completedQuery = null;
       const unsubscribe = shared.subscribe(() => panel.notify());
 
       function snapshot() {
@@ -85,6 +89,31 @@ export default defineModule("workspaces", (api) => {
         return `c:${workspace.workspaceId}`;
       }
 
+      /**
+       * Tab fills the highlighted title without opening the scope.
+       *
+       * Completion stops before the trailing space: that space is the scope
+       * marker, so adding it would make Tab the same navigation as Enter. The
+       * workspace list and its highlighted row stay put; Enter or a typed space
+       * then opens the scope.
+       */
+      function onListKeydown(event, _panel, row) {
+        if (event?.key !== "Tab") return false;
+        if (
+          event.shiftKey === true ||
+          event.altKey === true ||
+          event.ctrlKey === true ||
+          event.metaKey === true
+        ) {
+          return false;
+        }
+        if (row === null || row === undefined || typeof row.completeTitle !== "function") {
+          return false;
+        }
+        row.completeTitle();
+        return true;
+      }
+
       function listView(parsed, panel) {
         const { workspaceRows } = snapshot();
         const rows = filterEntries(workspaceRows, parsed.filter).map(({ entry, positions }) => ({
@@ -98,6 +127,10 @@ export default defineModule("workspaces", (api) => {
             panel.setQuery(remember(entry), {
               selectedKey: scopeStartKey(entry),
             });
+          },
+          completeTitle() {
+            completedQuery = `+${entry.title}`;
+            panel.setQuery(completedQuery, { selectedKey: `w:${entry.workspaceId}` });
           },
           // Shift+Enter used to start a session here. Starting a workspace next
           // to this one is the first half of the same intent, and the "=" mode
@@ -116,10 +149,12 @@ export default defineModule("workspaces", (api) => {
           listLabel: api.t("listLabelWorkspaces"),
           searchAria: api.t("searchAriaWorkspaces"),
           rows,
+          keydown: onListKeydown,
           emptyText: rows.length === 0 ? api.t("emptyWorkspaces") : null,
           note: null,
           hints: [
             { keys: ["Enter"], label: api.t("hintViewSessions") },
+            { keys: ["Tab"], label: api.t("hintCompleteTitle") },
             { keys: ["Shift+Enter"], label: api.t("hintWorkspacePath") },
             { keys: ["Esc"], label: api.t("hintClose") },
           ],
@@ -178,7 +213,16 @@ export default defineModule("workspaces", (api) => {
             id: "workspaces",
             priority: 10,
             match(query) {
-              if (!query.startsWith("+")) return null;
+              if (!query.startsWith("+")) {
+                completedQuery = null;
+                return null;
+              }
+              // A Tab completion stays on the workspace list for this exact
+              // query; only the next key (Enter or a space) may open the scope.
+              if (completedQuery !== null && query === completedQuery) {
+                return { mode: "list", filter: query.slice(1) };
+              }
+              completedQuery = null;
               const { workspaceRows } = snapshot();
               if (pinned !== null && !query.startsWith(pinned.token)) pinned = null;
               const rest = query.slice(1);
